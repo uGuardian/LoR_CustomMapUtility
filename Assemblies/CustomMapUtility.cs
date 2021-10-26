@@ -9,11 +9,54 @@ using Mod;
 
 namespace CustomMapUtility {
     public class CustomMapHandler {
-        public static void InitCustomMap(string stageName, MapManager manager, bool initBGMs = true) {
-            var Instance = new CustomMapHandler();
-            Instance.Init(stageName, manager, initBGMs);
+        public readonly struct Offsets {
+            public Offsets(float bgOffsetX = 0.5f, float bgOffsetY = 0.5f,
+                float floorOffsetX = 0.5f, float floorOffsetY = (407.5f/1080f),
+                float underOffsetX = 0.5f, float underOffsetY = (300f/1080f)) {
+                    BGOffset = new Vector2(bgOffsetX, bgOffsetY);
+                    FloorOffset = new Vector2(floorOffsetX, floorOffsetY);
+                    UnderOffset = new Vector2(underOffsetX, underOffsetY);
+            }
+            public readonly Vector2 BGOffset;
+            public readonly Vector2 FloorOffset;
+            public readonly Vector2 UnderOffset;
         }
-        public void Init(string stageName, MapManager manager, bool initBGMs = true) {
+        public static void InitCustomMap(string stageName, MapManager manager) {
+            var Instance = new CustomMapHandler();
+            Instance.Init(stageName, manager, new Offsets(), false, true);
+        }
+        public static void InitCustomMap(string stageName, MapManager manager,
+            bool isEgo = false) {
+                new CustomMapHandler().Init(stageName, manager, new Offsets(), isEgo, true);
+        }
+        public static void InitCustomMap(string stageName, MapManager manager,
+            bool isEgo = false, bool initBGMs = true) {
+                new CustomMapHandler().Init(stageName, manager, new Offsets(), isEgo, initBGMs);
+        }
+        public static void InitCustomMap(string stageName, MapManager manager,
+            float bgx = 0.5f, float bgy = 0.5f,
+            float floorx = 0.5f, float floory = (407.5f/1080f),
+            float underx = 0.5f, float undery = (300f/1080f)) {
+                var offsets = new Offsets(bgx, bgy, floorx, floory, underx, undery);
+                new CustomMapHandler().Init(stageName, manager, offsets, false, true);
+        }
+        public static void InitCustomMap(string stageName, MapManager manager,
+            bool isEgo = false,
+            float bgx = 0.5f, float bgy = 0.5f,
+            float floorx = 0.5f, float floory = (407.5f/1080f),
+            float underx = 0.5f, float undery = (300f/1080f)) {
+                var offsets = new Offsets(bgx, bgy, floorx, floory, underx, undery);
+                new CustomMapHandler().Init(stageName, manager, offsets, isEgo, true);
+        }
+        public static void InitCustomMap(string stageName, MapManager manager,
+            bool isEgo = false, bool initBGMs = true,
+            float bgx = 0.5f, float bgy = 0.5f,
+            float floorx = 0.5f, float floory = (407.5f/1080f),
+            float underx = 0.5f, float undery = (300f/1080f)) {
+                var offsets = new Offsets(bgx, bgy, floorx, floory, underx, undery);
+                new CustomMapHandler().Init(stageName, manager, offsets, isEgo, initBGMs);
+        }
+        private void Init(string stageName, MapManager manager, Offsets offsets, bool isEgo, bool initBGMs) {
             GameObject mapObject = Util.LoadPrefab("InvitationMaps/InvitationMap_Philip1", SingletonBehavior<BattleSceneRoot>.Instance.transform);
             mapObject.name = "InvitationMap_"+stageName;
             manager = this.InitManager(manager, mapObject);
@@ -40,7 +83,7 @@ namespace CustomMapUtility {
             }
             log += Environment.NewLine+"}";
             Debug.Log(log);
-            SetTextures(manager);
+            SetTextures(manager, offsets);
             SetScratches(stageName, manager);
             if (initBGMs) {
                 try {
@@ -65,16 +108,22 @@ namespace CustomMapUtility {
             } else {
                 Debug.Log("CustomMapUtility: Auto BGM initialization is off.");
             }
-            SingletonBehavior<BattleSceneRoot>.Instance.InitInvitationMap(manager);
+            if (!isEgo) {
+                SingletonBehavior<BattleSceneRoot>.Instance.InitInvitationMap(manager);
+                Debug.Log("CustomMapUtility: Map Initialized.");
+            } else {
+                SingletonBehavior<BattleSceneRoot>.Instance.AddEgoMap(manager);
+                Debug.Log("CustomMapUtility: EGO Map Initialized.");
+            }
         }
-        private void SetTextures(MapManager manager) {
+        private void SetTextures(MapManager manager, Offsets offsets) {
             foreach (var component in manager.GetComponentsInChildren<Component>()) {
                 switch (component) {
                     case SpriteRenderer renderer when renderer.name == "BG":
                     {
                         var texture = newAssets["newBG"];
                         float pixelsPerUnit = (100f/1920f*(float)texture.width);
-                        renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f), pixelsPerUnit);
+                        renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), offsets.BGOffset, pixelsPerUnit);
                         Debug.LogWarning(renderer.gameObject.transform.localScale);
                         break;
                     }
@@ -82,7 +131,7 @@ namespace CustomMapUtility {
                     {
                         var texture = newAssets["newFloor"];
                         float pixelsPerUnit = (100f/1920f*(float)texture.width);
-                        renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, (407.5f/1080f)), pixelsPerUnit);
+                        renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), offsets.FloorOffset, pixelsPerUnit);
                         Debug.LogWarning(renderer.gameObject.transform.localScale);
                         break;
                     }
@@ -91,7 +140,7 @@ namespace CustomMapUtility {
                         var texture = newAssets["newUnder"];
                         if (texture != null){
                             float pixelsPerUnit = (100f/1920f*(float)texture.width);
-                            renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, (300f/1080f)), pixelsPerUnit);
+                            renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), offsets.UnderOffset, pixelsPerUnit);
                         } else {
                             renderer.gameObject.SetActive(false);
                         }

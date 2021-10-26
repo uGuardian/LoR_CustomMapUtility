@@ -40,43 +40,7 @@ namespace CustomMapUtility {
             }
             log += Environment.NewLine+"}";
             Debug.Log(log);
-
-            foreach (var component in manager.GetComponentsInChildren<Component>()) {
-                switch (component) {
-                    case SpriteRenderer renderer when renderer.name == "BG":
-                    {
-                        var texture = newAssets["newBG"];
-                        float pixelsPerUnit = (100f/1920f*(float)texture.width);
-                        renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f), pixelsPerUnit);
-                        break;
-                    }
-                    case SpriteRenderer renderer when renderer.name.Contains("Floor"):
-                    {
-                        var texture = newAssets["newFloor"];
-                        float pixelsPerUnit = (100f/1920f*(float)texture.width);
-                        renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, (407.5f/1080f)), pixelsPerUnit);
-                        break;
-                    }
-                    case SpriteRenderer renderer when renderer.name.Contains("Under"):
-                    {
-                        var texture = newAssets["newUnder"];
-                        if (texture != null){
-                            float pixelsPerUnit = (100f/1920f*(float)texture.width);
-                            renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, (300f/1080f)), pixelsPerUnit);
-                        } else {
-                            renderer.gameObject.SetActive(false);
-                        }
-                        break;
-                    }
-                    default:
-                    {
-                        if (component.name.Contains("Effect") || component.name.Contains("Filter")) {
-                            component.gameObject.SetActive(false);
-                        }
-                        break;
-                    }
-                }
-            }
+            SetTextures(manager);
             SetScratches(stageName, manager);
             if (initBGMs) {
                 try {
@@ -102,6 +66,46 @@ namespace CustomMapUtility {
                 Debug.Log("CustomMapUtility: Auto BGM initialization is off.");
             }
             SingletonBehavior<BattleSceneRoot>.Instance.InitInvitationMap(manager);
+        }
+        private void SetTextures(MapManager manager) {
+            foreach (var component in manager.GetComponentsInChildren<Component>()) {
+                switch (component) {
+                    case SpriteRenderer renderer when renderer.name == "BG":
+                    {
+                        var texture = newAssets["newBG"];
+                        float pixelsPerUnit = (100f/1920f*(float)texture.width);
+                        renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f), pixelsPerUnit);
+                        Debug.LogWarning(renderer.gameObject.transform.localScale);
+                        break;
+                    }
+                    case SpriteRenderer renderer when renderer.name.Contains("Floor"):
+                    {
+                        var texture = newAssets["newFloor"];
+                        float pixelsPerUnit = (100f/1920f*(float)texture.width);
+                        renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, (407.5f/1080f)), pixelsPerUnit);
+                        Debug.LogWarning(renderer.gameObject.transform.localScale);
+                        break;
+                    }
+                    case SpriteRenderer renderer when renderer.name.Contains("Under"):
+                    {
+                        var texture = newAssets["newUnder"];
+                        if (texture != null){
+                            float pixelsPerUnit = (100f/1920f*(float)texture.width);
+                            renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, (300f/1080f)), pixelsPerUnit);
+                        } else {
+                            renderer.gameObject.SetActive(false);
+                        }
+                        break;
+                    }
+                    default:
+                    {
+                        if (component.name.Contains("Effect") || component.name.Contains("Filter")) {
+                            component.gameObject.SetActive(false);
+                        }
+                        break;
+                    }
+                }
+            }
         }
         private Texture2D ImageLoad(string name, string currentStagePath) {
             Texture2D texture = new Texture2D(2, 2);

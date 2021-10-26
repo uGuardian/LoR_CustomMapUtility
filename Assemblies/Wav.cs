@@ -21,7 +21,7 @@ namespace CustomMapUtility {
             public RIFF(BinaryReader BinReader) {
                 ChunkID = BinReader.ReadUInt32();
                 if (ChunkID != 1179011410u) {
-                    throw new Exception("Audio file is corrupt");
+                    throw new Exception("Starting Header isn't RIFF, audio file is probably corrupt");
                 }
                 ChunkSize = BinReader.ReadUInt32();
                 Format = BinReader.ReadUInt32();

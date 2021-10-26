@@ -16,7 +16,7 @@ namespace Template {
 
     // You probably only want to use one manager.
     public class TemplateMapManager : CustomMapManager {
-        protected override string[] CustomBGMs {
+        protected internal override string[] CustomBGMs {
             get {
                 return new string[] {"MyBGM"};
             }
@@ -24,7 +24,7 @@ namespace Template {
     }
     // ADVANCED: This is if you want to use the base functions of the CreatureMapManager rather than just the normal manager.
     public class TemplateCreatureMapManager : CustomCreatureMapManager {
-        protected override string[] CustomBGMs {
+        protected internal override string[] CustomBGMs {
             get {
                 return new string[] {"MyBGM"};
             }

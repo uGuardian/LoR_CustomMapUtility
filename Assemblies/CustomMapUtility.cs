@@ -16,37 +16,60 @@ namespace CustomMapUtility {
                     BGOffset = new Vector2(bgOffsetX, bgOffsetY);
                     FloorOffset = new Vector2(floorOffsetX, floorOffsetY);
                     UnderOffset = new Vector2(underOffsetX, underOffsetY);
+                    // Debug.Log(BGOffset);
+                    // Debug.Log(FloorOffset);
+                    // Debug.Log(UnderOffset);
             }
             public readonly Vector2 BGOffset;
             public readonly Vector2 FloorOffset;
             public readonly Vector2 UnderOffset;
         }
         public static void InitCustomMap(string stageName, MapManager manager) {
-            var Instance = new CustomMapHandler();
-            Instance.Init(stageName, manager, new Offsets(), false, true);
+            Offsets offsets;
+            bool initBGMs = true;
+            if (mapOffsetsCache.TryGetValue(stageName, out offsets)) {
+                initBGMs = mapAutoBgmCache[stageName];
+                Debug.Log("CustomMapUtility: Loaded offsets from cache");
+            } else {offsets = new Offsets(0.5f, 0.5f);}
+            new CustomMapHandler().Init(stageName, manager, offsets, false, initBGMs);
         }
         public static void InitCustomMap(string stageName, MapManager manager,
             bool isEgo = false) {
-                new CustomMapHandler().Init(stageName, manager, new Offsets(), isEgo, true);
+                Offsets offsets;
+                bool initBGMs = true;
+                if (mapOffsetsCache.TryGetValue(stageName, out offsets)) {
+                    initBGMs = mapAutoBgmCache[stageName];
+                    Debug.Log("CustomMapUtility: Loaded offsets from cache");
+                }
+                else {offsets = new Offsets(0.5f, 0.5f);}
+                new CustomMapHandler().Init(stageName, manager, offsets, isEgo, initBGMs);
         }
         public static void InitCustomMap(string stageName, MapManager manager,
             bool isEgo = false, bool initBGMs = true) {
-                new CustomMapHandler().Init(stageName, manager, new Offsets(), isEgo, initBGMs);
+                Offsets offsets;
+                if (mapOffsetsCache.TryGetValue(stageName, out offsets)) {
+                    Debug.Log("CustomMapUtility: Loaded offsets from cache");
+                } else {offsets = new Offsets(0.5f, 0.5f);}
+                new CustomMapHandler().Init(stageName, manager, offsets, isEgo, initBGMs);
         }
         public static void InitCustomMap(string stageName, MapManager manager,
             float bgx = 0.5f, float bgy = 0.5f,
             float floorx = 0.5f, float floory = (407.5f/1080f),
             float underx = 0.5f, float undery = (300f/1080f)) {
+                bool initBGMs = true;
+                if (mapAutoBgmCache.TryGetValue(stageName, out initBGMs)) {}
                 var offsets = new Offsets(bgx, bgy, floorx, floory, underx, undery);
-                new CustomMapHandler().Init(stageName, manager, offsets, false, true);
+                new CustomMapHandler().Init(stageName, manager, offsets, false, initBGMs);
         }
         public static void InitCustomMap(string stageName, MapManager manager,
             bool isEgo = false,
             float bgx = 0.5f, float bgy = 0.5f,
             float floorx = 0.5f, float floory = (407.5f/1080f),
             float underx = 0.5f, float undery = (300f/1080f)) {
+                bool initBGMs = true;
+                if (mapAutoBgmCache.TryGetValue(stageName, out initBGMs)) {}
                 var offsets = new Offsets(bgx, bgy, floorx, floory, underx, undery);
-                new CustomMapHandler().Init(stageName, manager, offsets, isEgo, true);
+                new CustomMapHandler().Init(stageName, manager, offsets, isEgo, initBGMs);
         }
         public static void InitCustomMap(string stageName, MapManager manager,
             bool isEgo = false, bool initBGMs = true,
@@ -56,11 +79,19 @@ namespace CustomMapUtility {
                 var offsets = new Offsets(bgx, bgy, floorx, floory, underx, undery);
                 new CustomMapHandler().Init(stageName, manager, offsets, isEgo, initBGMs);
         }
+
         private void Init(string stageName, MapManager manager, Offsets offsets, bool isEgo, bool initBGMs) {
+            List<MapManager> addedMapList = SingletonBehavior<BattleSceneRoot>.Instance.GetType().GetField("_addedMapList", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(SingletonBehavior<BattleSceneRoot>.Instance) as List<MapManager>;
+            MapManager x2 = (addedMapList != null) ? addedMapList.Find((MapManager x) => x.name.Contains(stageName)) : null;
+            if (x2 != null && x2.Equals(manager.GetType())) {
+                Debug.LogWarning("CustomMapUtility: Map already loaded, using it");
+                manager = x2;
+                return;
+            }
+
             GameObject mapObject = Util.LoadPrefab("InvitationMaps/InvitationMap_Philip1", SingletonBehavior<BattleSceneRoot>.Instance.transform);
             mapObject.name = "InvitationMap_"+stageName;
             manager = this.InitManager(manager, mapObject);
-
             var modResources = new ModResources();
 
             var currentStagePath = modResources.GetStagePath(stageName);
@@ -91,15 +122,15 @@ namespace CustomMapUtility {
                     if (managerTemp.CustomBGMs != null) {
                         manager.mapBgm = CustomBgmParse(managerTemp.CustomBGMs);
                     } else {
-                        Debug.LogWarning("CustomMapUtility: CustomBGMs is null");
+                        Debug.LogWarning("CustomMapUtility: CustomBGMs is null or empty");
                     }
                 } catch (NullReferenceException) {
                     try {
                         var managerTemp = manager as CustomCreatureMapManager;
-                        if (managerTemp.CustomBGMs != null) {
+                        if (managerTemp.CustomBGMs != null && managerTemp.CustomBGMs.Length != 0) {
                             manager.mapBgm = CustomBgmParse(managerTemp.CustomBGMs);
                         } else {
-                            Debug.LogWarning("CustomMapUtility: CustomBGMs is null");
+                            Debug.LogWarning("CustomMapUtility: CustomBGMs is null or empty");
                         }
                     } catch (NullReferenceException ex) {
                         Debug.LogError("CustomMapUtility: MapManager is not inherited from Custom(Creature)MapManager"+Environment.NewLine+ex+Environment.NewLine);
@@ -112,10 +143,17 @@ namespace CustomMapUtility {
                 SingletonBehavior<BattleSceneRoot>.Instance.InitInvitationMap(manager);
                 Debug.Log("CustomMapUtility: Map Initialized.");
             } else {
+                manager.GetType().GetField("_bMapInitialized", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(manager, false);
                 SingletonBehavior<BattleSceneRoot>.Instance.AddEgoMap(manager);
-                Debug.Log("CustomMapUtility: EGO Map Initialized.");
+                Debug.Log("CustomMapUtility: EGO Map Added.");
+                mapOffsetsCache[stageName] = offsets;
+                mapAutoBgmCache[stageName] = initBGMs;
             }
         }
+
+        private static Dictionary<string, Offsets> mapOffsetsCache = new Dictionary<string, Offsets>();
+        private static Dictionary<string, bool> mapAutoBgmCache = new Dictionary<string, bool>();
+
         private void SetTextures(MapManager manager, Offsets offsets) {
             foreach (var component in manager.GetComponentsInChildren<Component>()) {
                 switch (component) {
@@ -124,7 +162,6 @@ namespace CustomMapUtility {
                         var texture = newAssets["newBG"];
                         float pixelsPerUnit = (100f/1920f*(float)texture.width);
                         renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), offsets.BGOffset, pixelsPerUnit);
-                        Debug.LogWarning(renderer.gameObject.transform.localScale);
                         break;
                     }
                     case SpriteRenderer renderer when renderer.name.Contains("Floor"):
@@ -132,7 +169,6 @@ namespace CustomMapUtility {
                         var texture = newAssets["newFloor"];
                         float pixelsPerUnit = (100f/1920f*(float)texture.width);
                         renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), offsets.FloorOffset, pixelsPerUnit);
-                        Debug.LogWarning(renderer.gameObject.transform.localScale);
                         break;
                     }
                     case SpriteRenderer renderer when renderer.name.Contains("Under"):
@@ -245,8 +281,10 @@ namespace CustomMapUtility {
             log += Environment.NewLine+"}";
             Debug.Log(log);
         }
+
         public class ModResources {
             public class CacheInit : ModInitializer {
+                const string version = "PreRelease";
                 public override void OnInitializeMod()
                 {
                     var tempInstance = new ModResources();
@@ -255,10 +293,10 @@ namespace CustomMapUtility {
                             from modInfo in Mod.ModContentInfoLoader.LoadAllModInfos()
                             // where modInfo.activated == true
                             select modInfo.dirInfo;
-                        Debug.Log("CustomMapUtility in Global Mode");
+                        Debug.Log("CustomMapUtility Version \""+version+"\" in Global Mode");
                     } else {
                         var curDir = new DirectoryInfo(Assembly.GetExecutingAssembly().Location+"\\..\\..");
-                        Debug.Log("CustomMapUtility in Local Mode at "+curDir.FullName);
+                        Debug.Log("CustomMapUtility Version \""+version+"\" in Local Mode at "+curDir.FullName);
                         _dirInfos = new DirectoryInfo[]{curDir};
                     }
                     _stagePaths = tempInstance.GetStageRootPaths();
@@ -439,7 +477,7 @@ namespace CustomMapUtility {
                     wav = new Wav(path);
                 }
                 if (wav.NumChannels > 8) {
-                    Debug.LogError("Unity does not support more than 8 audio channels per file");
+                    Debug.LogError("CustomMapUtility:AudioHandler: Unity does not support more than 8 audio channels per file");
                     return null;
                 }
                 var audioClip = AudioClip.Create("BGM", (int)wav.SampleCount, wav.NumChannels, (int)wav.SampleRate, false);
@@ -454,12 +492,124 @@ namespace CustomMapUtility {
             Singleton<StageController>.Instance.GetCurrentWaveModel().team.emotionTotalBonus = emotionTotalCoinNumber + 1;
             Singleton<StageController>.Instance.GetStageModel().SetCurrentMapInfo(num);
         }
+        public static void ChangeToCustomEgoMap(string mapName, Faction faction = Faction.Player, MapManager manager = null, bool byAssimilationFlag = false) {
+            SingletonBehavior<BattleSceneRoot>.Instance.ChangeToCustomEgoMap(mapName, faction, manager, byAssimilationFlag); 
+        }
+        public static void AddCustomEgoMapByAssimilation(string name, Faction faction = Faction.Player, MapManager manager = null) {
+            Singleton<StageController>.Instance.AddCustomEgoMapByAssimilation(name, faction, manager);
+        }
+        public static void ChangeToCustomEgoMapByAssimilation(string mapName, Faction faction = Faction.Player, MapManager manager = null) {
+            Singleton<StageController>.Instance.AddCustomEgoMapByAssimilation(mapName, faction, manager);
+        }
+        public static void RemoveCustomEgoMapByAssimilation(string name) {
+            // Singleton<StageController>.Instance.RemoveEgoMapByAssimilation(name);
+            Singleton<StageController>.Instance.RemoveEgoMapAll();
+        }
+    }
+    public static class CustomMapUtilityExtensions {
+        public static void ChangeToCustomEgoMap(this BattleSceneRoot Instance, string mapName, Faction faction = Faction.Player, MapManager manager = null, bool byAssimilationFlag = false) {
+            if (String.IsNullOrWhiteSpace(mapName))
+            {
+                Debug.LogError("CustomMapUtility: Ego map not specified");
+                return;
+            }
+            List<MapManager> addedMapList = Instance.GetType().GetField("_addedMapList", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(Instance) as List<MapManager>;
+            MapChangeFilter mapChangeFilter = Instance.GetType().GetField("_mapChangeFilter", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(Instance) as MapChangeFilter;
+            MapManager x2 = (addedMapList != null) ? addedMapList.Find((MapManager x) => x.name.Contains(mapName)) : null;
+            if (x2 == null && manager == null) {
+                Debug.LogError("CustomMapUtility: Ego map not initialized");
+                return;
+            } else if (x2 == null) {
+                Debug.LogWarning("CustomMapUtility: Reinitializing Ego map");
+                CustomMapHandler.InitCustomMap(mapName, manager, true);
+                x2 = manager;
+            }
+            mapChangeFilter.StartMapChangingEffect((Direction)Faction.Player, true);
+            x2.isBossPhase = false;
+            x2.isEgo = true;
+            if (x2 != Instance.currentMapObject)
+            {
+                Instance.currentMapObject.EnableMap(false);
+                Instance.currentMapObject = x2;
+                if (!byAssimilationFlag) {
+                    Instance.currentMapObject.ActiveMap(true);
+                    Instance.currentMapObject.InitializeMap();
+                } else {
+                    if (!Instance.currentMapObject.IsMapInitialized) {
+                        Instance.currentMapObject.InitializeMap();
+                    }
+                    Instance.currentMapObject.EnableMap(true);
+			        Instance.currentMapObject.PlayMapChangedSound();
+                    SingletonBehavior<BattleCamManager>.Instance.SetVignetteColorBgCam(Instance.currentMapObject.sephirahColor, true);
+                    SingletonBehavior<BattleSoundManager>.Instance.SetEnemyTheme(Instance.currentMapObject.mapBgm);
+                }
+                return;
+            }
+            return;
+        }
+        public static void ChangeToCustomEgoMapByAssimilation(this BattleSceneRoot Instance, string mapName, Faction faction = Faction.Player, MapManager manager = null) {
+            Singleton<StageController>.Instance.AddCustomEgoMapByAssimilation(mapName, faction, manager);
+        }
+        public static void AddCustomEgoMapByAssimilation(this StageController Instance, string name, Faction faction = Faction.Player, MapManager manager = null) {
+            if (Singleton<StageController>.Instance.IsTwistedArgaliaBattleEnd())
+            {
+                return;
+            }
+            var addedEgoMapOrigin = Instance.GetType().GetField("_addedEgoMap", BindingFlags.NonPublic | BindingFlags.Instance);
+            List<string> addedEgoMap = addedEgoMapOrigin.GetValue(Instance) as List<string>;
+            addedEgoMap.Add(name);
+            addedEgoMapOrigin.SetValue(Instance, addedEgoMap);
+            if (name != null && name != string.Empty)
+            {
+                if (faction == Faction.Player) {
+                    SingletonBehavior<BattleSceneRoot>.Instance.ChangeToCustomEgoMap(name, faction, manager, true);
+                } else {
+                    SingletonBehavior<BattleSceneRoot>.Instance.ChangeToSpecialMap(name, true, false);
+                }
+            }
+        }
+        public static void RemoveCustomEgoMapByAssimilation(this StageController Instance, string name) {
+            // Instance.RemoveEgoMapByAssimilation(name);
+            Instance.RemoveEgoMapAll();
+        }
+        public static void InitCustomMap(this BattleSceneRoot Instance, string stageName, MapManager manager) {
+            CustomMapHandler.InitCustomMap(stageName, manager);
+        }
+        public static void InitCustomMap(this BattleSceneRoot Instance, string stageName, MapManager manager,
+            bool isEgo = false) {
+                CustomMapHandler.InitCustomMap(stageName, manager, isEgo);
+        }
+        public static void InitCustomMap(this BattleSceneRoot Instance, string stageName, MapManager manager,
+            bool isEgo = false, bool initBGMs = true) {
+                CustomMapHandler.InitCustomMap(stageName, manager, isEgo, initBGMs);
+        }
+        public static void InitCustomMap(this BattleSceneRoot Instance, string stageName, MapManager manager,
+            float bgx = 0.5f, float bgy = 0.5f,
+            float floorx = 0.5f, float floory = (407.5f/1080f),
+            float underx = 0.5f, float undery = (300f/1080f)) {
+                CustomMapHandler.InitCustomMap(stageName, manager, bgx, bgy, floorx, floory, underx, undery);
+        }
+        public static void InitCustomMap(this BattleSceneRoot Instance, string stageName, MapManager manager,
+            bool isEgo = false,
+            float bgx = 0.5f, float bgy = 0.5f,
+            float floorx = 0.5f, float floory = (407.5f/1080f),
+            float underx = 0.5f, float undery = (300f/1080f)) {
+                CustomMapHandler.InitCustomMap(stageName, manager, isEgo, bgx, bgy, floorx, floory, underx, undery);
+        }
+        public static void InitCustomMap(this BattleSceneRoot Instance, string stageName, MapManager manager,
+            bool isEgo = false, bool initBGMs = true,
+            float bgx = 0.5f, float bgy = 0.5f,
+            float floorx = 0.5f, float floory = (407.5f/1080f),
+            float underx = 0.5f, float undery = (300f/1080f)) {
+                CustomMapHandler.InitCustomMap(stageName, manager, isEgo, initBGMs, bgx, bgy, floorx, floory, underx, undery);
+        }
     }
 
     public class CustomMapManager : MapManager {
         public override void EnableMap(bool b) {
             base.EnableMap(b);
             this.gameObject.SetActive(b);
+            SingletonBehavior<BattleCamManager>.Instance.BlurBackgroundCam(!b);
         }
         public override GameObject GetScratch(int lv, Transform parent)
         {
@@ -473,6 +623,8 @@ namespace CustomMapUtility {
             foreach (var prefab in scratchPrefabs) {
                 DestroyObject(prefab);
             }
+            SingletonBehavior<BattleCamManager>.Instance.BlurBackgroundCam(true);
+            Debug.Log("CustomMapUtility: Cleaned up custom objects");
             base.ResetMap();
         }
         protected internal virtual string[] CustomBGMs {get;}
@@ -481,6 +633,7 @@ namespace CustomMapUtility {
         public override void EnableMap(bool b) {
             base.EnableMap(b);
             this.gameObject.SetActive(b);
+            SingletonBehavior<BattleCamManager>.Instance.BlurBackgroundCam(!b);
         }
         public override GameObject GetScratch(int lv, Transform parent)
         {
@@ -494,6 +647,7 @@ namespace CustomMapUtility {
             foreach (var prefab in scratchPrefabs) {
                 DestroyObject(prefab);
             }
+            SingletonBehavior<BattleCamManager>.Instance.BlurBackgroundCam(true);
             Debug.Log("CustomMapUtility: Cleaned up custom objects");
             base.ResetMap();
         }

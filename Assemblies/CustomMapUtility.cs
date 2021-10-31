@@ -3,12 +3,15 @@ using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 using UnityEngine;
 using NAudio.Wave;
 using Mod;
+#pragma warning disable MA0048,MA0076
 
 namespace CustomMapUtility {
     public class CustomMapHandler {
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
         public readonly struct Offsets {
             public Offsets(float bgOffsetX = 0.5f, float bgOffsetY = 0.5f,
                 float floorOffsetX = 0.5f, float floorOffsetY = (407.5f/1080f),
@@ -25,19 +28,17 @@ namespace CustomMapUtility {
             public readonly Vector2 UnderOffset;
         }
         public static void InitCustomMap(string stageName, MapManager manager) {
-            Offsets offsets;
             bool initBGMs = true;
-            if (mapOffsetsCache.TryGetValue(stageName, out offsets)) {
+            if (mapOffsetsCache.TryGetValue(stageName, out Offsets offsets)) {
                 initBGMs = mapAutoBgmCache[stageName];
                 Debug.Log("CustomMapUtility: Loaded offsets from cache");
             } else {offsets = new Offsets(0.5f, 0.5f);}
-            new CustomMapHandler().Init(stageName, manager, offsets, false, initBGMs);
+            new CustomMapHandler().Init(stageName, manager, offsets, isEgo: false, initBGMs);
         }
         public static void InitCustomMap(string stageName, MapManager manager,
             bool isEgo = false) {
-                Offsets offsets;
                 bool initBGMs = true;
-                if (mapOffsetsCache.TryGetValue(stageName, out offsets)) {
+                if (mapOffsetsCache.TryGetValue(stageName, out Offsets offsets)) {
                     initBGMs = mapAutoBgmCache[stageName];
                     Debug.Log("CustomMapUtility: Loaded offsets from cache");
                 }
@@ -46,28 +47,27 @@ namespace CustomMapUtility {
         }
         public static void InitCustomMap(string stageName, MapManager manager,
             bool isEgo = false, bool initBGMs = true) {
-                Offsets offsets;
-                if (mapOffsetsCache.TryGetValue(stageName, out offsets)) {
+                if (mapOffsetsCache.TryGetValue(stageName, out Offsets offsets))
+                {
                     Debug.Log("CustomMapUtility: Loaded offsets from cache");
-                } else {offsets = new Offsets(0.5f, 0.5f);}
+                }
+                else { offsets = new Offsets(0.5f, 0.5f); }
                 new CustomMapHandler().Init(stageName, manager, offsets, isEgo, initBGMs);
         }
         public static void InitCustomMap(string stageName, MapManager manager,
             float bgx = 0.5f, float bgy = 0.5f,
             float floorx = 0.5f, float floory = (407.5f/1080f),
             float underx = 0.5f, float undery = (300f/1080f)) {
-                bool initBGMs = true;
-                if (mapAutoBgmCache.TryGetValue(stageName, out initBGMs)) {}
-                var offsets = new Offsets(bgx, bgy, floorx, floory, underx, undery);
-                new CustomMapHandler().Init(stageName, manager, offsets, false, initBGMs);
+            if (mapAutoBgmCache.TryGetValue(stageName, out bool initBGMs)) { }
+            var offsets = new Offsets(bgx, bgy, floorx, floory, underx, undery);
+                new CustomMapHandler().Init(stageName, manager, offsets, isEgo: false, initBGMs);
         }
         public static void InitCustomMap(string stageName, MapManager manager,
             bool isEgo = false,
             float bgx = 0.5f, float bgy = 0.5f,
             float floorx = 0.5f, float floory = (407.5f/1080f),
             float underx = 0.5f, float undery = (300f/1080f)) {
-                bool initBGMs = true;
-                if (mapAutoBgmCache.TryGetValue(stageName, out initBGMs)) {}
+                if (mapAutoBgmCache.TryGetValue(stageName, out bool initBGMs)) { }
                 var offsets = new Offsets(bgx, bgy, floorx, floory, underx, undery);
                 new CustomMapHandler().Init(stageName, manager, offsets, isEgo, initBGMs);
         }
@@ -82,7 +82,7 @@ namespace CustomMapUtility {
 
         private void Init(string stageName, MapManager manager, Offsets offsets, bool isEgo, bool initBGMs) {
             List<MapManager> addedMapList = SingletonBehavior<BattleSceneRoot>.Instance.GetType().GetField("_addedMapList", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(SingletonBehavior<BattleSceneRoot>.Instance) as List<MapManager>;
-            MapManager x2 = (addedMapList != null) ? addedMapList.Find((MapManager x) => x.name.Contains(stageName)) : null;
+            MapManager x2 = addedMapList?.Find((MapManager x) => x.name.Contains(stageName));
             if (x2 != null && x2.Equals(manager.GetType())) {
                 Debug.LogWarning("CustomMapUtility: Map already loaded, using it");
                 manager = x2;
@@ -95,13 +95,13 @@ namespace CustomMapUtility {
             var modResources = new ModResources();
 
             var currentStagePath = modResources.GetStagePath(stageName);
-            newAssets = new Dictionary<string, Texture2D>(){
+            newAssets = new Dictionary<string, Texture2D>(StringComparer.Ordinal){
                 {"newBG", ImageLoad("Background", currentStagePath)},
                 {"newFloor", ImageLoad("Floor", currentStagePath)},
                 {"newUnder", ImageLoad("FloorUnder", currentStagePath)},
                 {"scratch1", ImageLoad("Scratch1", currentStagePath)},
                 {"scratch2", ImageLoad("Scratch2", currentStagePath)},
-                {"scratch3", ImageLoad("Scratch3", currentStagePath)}
+                {"scratch3", ImageLoad("Scratch3", currentStagePath)},
             };
             string log = "CustomMapUtility: New Assets: {";
             foreach (var img in newAssets) {
@@ -122,7 +122,8 @@ namespace CustomMapUtility {
                     if (managerTemp.CustomBGMs != null) {
                         manager.mapBgm = CustomBgmParse(managerTemp.CustomBGMs);
                     } else {
-                        Debug.LogWarning("CustomMapUtility: CustomBGMs is null or empty");
+                        // If you get this error and your method stops, you've called SingletonBehavior<BattleSoundManager>.Instance.OnStageStart(), don't do that. 
+                        Debug.LogError("CustomMapUtility: CustomBGMs is null or empty, filling with current themes");
                     }
                 } catch (NullReferenceException) {
                     try {
@@ -130,20 +131,21 @@ namespace CustomMapUtility {
                         if (managerTemp.CustomBGMs != null && managerTemp.CustomBGMs.Length != 0) {
                             manager.mapBgm = CustomBgmParse(managerTemp.CustomBGMs);
                         } else {
-                            Debug.LogWarning("CustomMapUtility: CustomBGMs is null or empty");
+                            // If you get this error and your method stops, you've called SingletonBehavior<BattleSoundManager>.Instance.OnStageStart(), don't do that. 
+                            Debug.LogError("CustomMapUtility: CustomBGMs is null or empty, filling with current themes");
                         }
                     } catch (NullReferenceException ex) {
-                        Debug.LogError("CustomMapUtility: MapManager is not inherited from Custom(Creature)MapManager"+Environment.NewLine+ex+Environment.NewLine);
+                        Debug.LogError($"CustomMapUtility: MapManager is not inherited from Custom(Creature)MapManager{Environment.NewLine}{ex}{Environment.NewLine}");
                     }
                 }
             } else {
-                Debug.Log("CustomMapUtility: Auto BGM initialization is off.");
+                Debug.LogWarning("CustomMapUtility: Auto BGM initialization is off");
             }
             if (!isEgo) {
                 SingletonBehavior<BattleSceneRoot>.Instance.InitInvitationMap(manager);
                 Debug.Log("CustomMapUtility: Map Initialized.");
             } else {
-                manager.GetType().GetField("_bMapInitialized", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(manager, false);
+                manager.GetType().GetField("_bMapInitialized", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(manager, value: false);
                 SingletonBehavior<BattleSceneRoot>.Instance.AddEgoMap(manager);
                 Debug.Log("CustomMapUtility: EGO Map Added.");
                 mapOffsetsCache[stageName] = offsets;
@@ -151,13 +153,13 @@ namespace CustomMapUtility {
             }
         }
 
-        private static Dictionary<string, Offsets> mapOffsetsCache = new Dictionary<string, Offsets>();
-        private static Dictionary<string, bool> mapAutoBgmCache = new Dictionary<string, bool>();
+        private static readonly Dictionary<string, Offsets> mapOffsetsCache = new Dictionary<string, Offsets>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, bool> mapAutoBgmCache = new Dictionary<string, bool>(StringComparer.Ordinal);
 
         private void SetTextures(MapManager manager, Offsets offsets) {
             foreach (var component in manager.GetComponentsInChildren<Component>()) {
                 switch (component) {
-                    case SpriteRenderer renderer when renderer.name == "BG":
+                    case SpriteRenderer renderer when string.Equals(renderer.name, "BG", StringComparison.Ordinal):
                     {
                         var texture = newAssets["newBG"];
                         float pixelsPerUnit = (100f/1920f*(float)texture.width);
@@ -178,6 +180,7 @@ namespace CustomMapUtility {
                             float pixelsPerUnit = (100f/1920f*(float)texture.width);
                             renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), offsets.UnderOffset, pixelsPerUnit);
                         } else {
+                            #pragma warning disable MA0003
                             renderer.gameObject.SetActive(false);
                         }
                         break;
@@ -186,6 +189,7 @@ namespace CustomMapUtility {
                     {
                         if (component.name.Contains("Effect") || component.name.Contains("Filter")) {
                             component.gameObject.SetActive(false);
+                            #pragma warning restore MA0003
                         }
                         break;
                     }
@@ -203,10 +207,12 @@ namespace CustomMapUtility {
             }
             return texture;
         }
-        public Dictionary<string, Texture2D> newAssets = new Dictionary<string, Texture2D>();
+        #pragma warning disable MA0016
+        public Dictionary<string, Texture2D> newAssets;
+        #pragma warning restore MA0016
         private void SetScratches(string stageName, MapManager manager) {
             if (newAssets["scratch3"] == null && newAssets["scratch2"] == null && newAssets["scratch1"] == null) {
-                manager.scratchPrefabs = new GameObject[0];
+                manager.scratchPrefabs = Array.Empty<GameObject>();
                 return;
             }
             Texture2D texture;
@@ -214,7 +220,6 @@ namespace CustomMapUtility {
             int i;
             string name = "";
             for (i = 0; i < 3; i++) {
-                var current = manager.scratchPrefabs[i];
                 switch (i) {
                     case 2:
                         name = "_Scratch_3";
@@ -226,6 +231,7 @@ namespace CustomMapUtility {
                         name = "_Scratch_1";
                         break;
                 }
+                GameObject current;
                 switch (i) {
                     case 2: {
                         texture = newAssets["scratch3"];
@@ -238,7 +244,8 @@ namespace CustomMapUtility {
                                 current = manager.scratchPrefabs[2];
                             }
                             break;
-                        } else {goto case 1;}
+                        }
+                        goto case 1;
                     }
                     case 1: {
                         texture = newAssets["scratch2"];
@@ -251,7 +258,8 @@ namespace CustomMapUtility {
                                 current = manager.scratchPrefabs[1];
                             }
                             break;
-                        } else {goto case 0;}
+                        }
+                        goto case 0;
                     }
                     case 0: {
                         texture = newAssets["scratch1"];
@@ -264,7 +272,8 @@ namespace CustomMapUtility {
                                 current = manager.scratchPrefabs[0];
                             }
                             break;
-                        } else {goto default;}
+                        }
+                        goto default;
                     }
                     default: {
                         current = null;
@@ -273,9 +282,9 @@ namespace CustomMapUtility {
                 }
                 manager.scratchPrefabs[i] = current;
                 try {
-                    log += Environment.NewLine+"    Scratch"+i+" = "+current.name;
+                    log += $"{Environment.NewLine}    Scratch{i} = {current.name}";
                 } catch {
-                    log += Environment.NewLine+"    Scratch"+i+" = null";
+                    log += $"{Environment.NewLine}    Scratch{i} = null";
                 }
             }
             log += Environment.NewLine+"}";
@@ -284,19 +293,19 @@ namespace CustomMapUtility {
 
         public class ModResources {
             public class CacheInit : ModInitializer {
-                const string version = "PreRelease";
+                const string version = "1.0.0";
                 public override void OnInitializeMod()
                 {
                     var tempInstance = new ModResources();
-                    if (Assembly.GetExecutingAssembly().GetName().Name == "ConfigAPI") {
+                    if (string.Equals(Assembly.GetExecutingAssembly().GetName().Name, "ConfigAPI", StringComparison.Ordinal)) {
                         _dirInfos =
                             from modInfo in Mod.ModContentInfoLoader.LoadAllModInfos()
                             // where modInfo.activated == true
                             select modInfo.dirInfo;
-                        Debug.Log("CustomMapUtility Version \""+version+"\" in Global Mode");
+                        Debug.Log($"CustomMapUtility Version \"{version}\" in Global Mode");
                     } else {
                         var curDir = new DirectoryInfo(Assembly.GetExecutingAssembly().Location+"\\..\\..");
-                        Debug.Log("CustomMapUtility Version \""+version+"\" in Local Mode at "+curDir.FullName);
+                        Debug.Log($"CustomMapUtility Version \"{version}\" in Local Mode at {curDir.FullName}");
                         _dirInfos = new DirectoryInfo[]{curDir};
                     }
                     _stagePaths = tempInstance.GetStageRootPaths();
@@ -304,7 +313,7 @@ namespace CustomMapUtility {
                     if (_stagePaths != null && _stagePaths.Count != 0) {
                         string stagePathsDebug = "CustomMapUtility StageRootPaths: {";
                         foreach (var dir in _stagePaths) {
-                            stagePathsDebug += Environment.NewLine+"    "+dir.FullName;
+                            stagePathsDebug += $"{Environment.NewLine}    {dir.FullName}";
                         }
                         stagePathsDebug += Environment.NewLine+"}";
                         Debug.Log(stagePathsDebug);
@@ -312,7 +321,7 @@ namespace CustomMapUtility {
                     if (_bgms != null && _bgms.Count != 0) {
                         string bgmsDebug = "CustomMapUtility BgmPaths: {";
                         foreach (var path in _bgms) {
-                            bgmsDebug += Environment.NewLine+"    "+path.FullName;
+                            bgmsDebug += $"{Environment.NewLine}    {path.FullName}";
                         }
                         bgmsDebug += Environment.NewLine+"}";
                         Debug.Log(bgmsDebug);
@@ -323,6 +332,7 @@ namespace CustomMapUtility {
                     var list = new List<string>();
                     var list2 = new List<string>();
                     list.Add("NAudio");
+                    list.Add("netstandard");
                     using (var enumerator = Singleton<ModContentManager>.Instance.GetErrorLogs().GetEnumerator()) {
                         while (enumerator.MoveNext()) {
                             var errorLog = enumerator.Current;
@@ -339,37 +349,35 @@ namespace CustomMapUtility {
             public string GetStagePath(string stageName) {
                 IEnumerable<DirectoryInfo> stagePaths =
                     from info in GetStageRootPaths()
-                    where info.Name == stageName
+                    where string.Equals(info.Name, stageName, StringComparison.Ordinal)
                     select info;
                 string path = null;
                 foreach (var dir in stagePaths) {
                     if (path == null) {
                         path = dir.FullName;
                     } else {
-                        throw new System.ArgumentException("Multiple stages share this name");
+                        throw new ArgumentException("Multiple stages share this name", nameof(stageName));
                     }
                 }
                 if (path == null) {
-                    throw new System.NullReferenceException("Stage does not exist");
+                    throw new ArgumentNullException(nameof(stageName), "Stage does not exist");
                 }
                 Debug.Log("CustomMapUtility: Loading stage from "+path);
                 return path;
             }
-            [Obsolete]
-            private List<FileInfo> GetStageBgmPaths() {
-                return GetStageBgmInfos();
-            }
+            [Obsolete("Use GetStageBgmInfos() instead")]
+            private List<FileInfo> GetStageBgmPaths() => GetStageBgmInfos();
             private static List<FileInfo> _bgms;
-            [Obsolete]
+            [Obsolete("Use GetStageBgmInfos(string[]) instead")]
             public string[] GetStageBgmPaths(string[] bgmNames) {
                 int debugCount = 0;
                 foreach (var bgm in bgmNames) {
-                    Debug.Log("CustomMapUtility: BGM"+debugCount+": "+bgm+Environment.NewLine);
+                    Debug.Log($"CustomMapUtility: BGM{debugCount}: {bgm}{Environment.NewLine}");
                     debugCount++;
                 }
                 IEnumerable<string> bgms =
                     from file in GetStageBgmPaths()
-                    where bgmNames.Any(b => b == file.Name)
+                    where bgmNames.Any(b => string.Equals(b, file.Name, StringComparison.OrdinalIgnoreCase))
                     select file.FullName;
                 return bgms.ToArray();
             }
@@ -391,7 +399,7 @@ namespace CustomMapUtility {
             public FileInfo[] GetStageBgmInfos(string[] bgmNames) {
                 IEnumerable<FileInfo> bgms =
                     from file in GetStageBgmInfos()
-                    where bgmNames.Any(b => b == file.Name)
+                    where bgmNames.Any(b => string.Equals(b, file.Name, StringComparison.OrdinalIgnoreCase))
                     select file;
                 return bgms.ToArray();
             }
@@ -435,6 +443,9 @@ namespace CustomMapUtility {
             UnityEngine.Object.Destroy(original);
             return newManager;
         }
+        public static AudioClip CustomBgmParse(string BGM) {
+            return CustomMapHandler.CustomBgmParse(new string[]{BGM})[0];
+        }
         public static AudioClip[] CustomBgmParse(string[] BGMs) {
             var resources = new ModResources();
             var files = resources.GetStageBgmInfos(BGMs);
@@ -443,14 +454,13 @@ namespace CustomMapUtility {
             for (int i = 0; i < BGMs.Length; i++) {
                 try {
                     var info = new FileInfo(BGMs[i]);
-                    Debug.Log("CustomMapUtility: BGM"+i+" = "+BGMs[i]);
-                    if (info.Extension == ".mp3") {
-                        output[i] = handler.Parse(files[i].FullName);
-                    } else if (info.Extension == ".wav") {
-                        output[i] = handler.Parse(files[i].FullName, false);
+                    Debug.Log($"CustomMapUtility: BGM{i} = {BGMs[i]}");
+                    if (string.Equals(info.Extension, ".mp3", StringComparison.OrdinalIgnoreCase)) {
+                        output[i] = handler.Parse(files[i].FullName, AudioHandler.FileType.mp3);
+                    } else if (string.Equals(info.Extension, ".wav", StringComparison.OrdinalIgnoreCase)) {
+                        output[i] = handler.Parse(files[i].FullName, AudioHandler.FileType.wav);
                     } else {
-                        Debug.LogError(info.Name+" is not an mp3 or wav, filling with null");
-                        output[i] = null;
+                        output[i] = handler.Parse(files[i].FullName, AudioHandler.FileType.unknown);
                     }
                 } catch (Exception ex) {
                     Debug.LogException(ex);
@@ -460,33 +470,112 @@ namespace CustomMapUtility {
             return output;
         }
         internal class AudioHandler {
-            [Obsolete]
-            internal AudioClip Convert(string path, bool mp3 = true) {
-                return Parse(path, mp3);
-            }
-            internal AudioClip Parse(string path, bool mp3 = true)
+            [Obsolete("Use Parse(string, FileType) Instead")]
+            internal AudioClip Convert(string path, bool mp3 = true) => Parse(path, FileType.mp3);
+            internal AudioClip Parse(string path, FileType format)
             {
                 Wav wav;
-                if (mp3) {
-                    var sourceProvider = new Mp3FileReader(path);
-                    MemoryStream stream = new MemoryStream();
-                    WaveFileWriter.WriteWavFileToStream(stream, sourceProvider);
-                    // WaveFileWriter.CreateWaveFile(path + ".wav", sourceProvider);
-                    wav = new Wav(stream.ToArray());
-                } else {
+                if (format == FileType.mp3) {
+                    using (var sourceProvider = new Mp3FileReader(path)) {
+                        MemoryStream stream = new MemoryStream();
+                        WaveFileWriter.WriteWavFileToStream(stream, sourceProvider);
+                        wav = new Wav(stream.ToArray());
+                    }
+                } else if (format == FileType.wav) {
                     wav = new Wav(path);
+                } else {
+                    // using (var sourceProvider = new MediaFoundationReader(path)) {
+                    //     MemoryStream stream = new MemoryStream();
+                    //     WaveFileWriter.WriteWavFileToStream(stream, sourceProvider);
+                    //     wav = new Wav(stream);
+                    // }
+                    throw new NotSupportedException("Only wav and mp3 are supported");
                 }
                 if (wav.NumChannels > 8) {
-                    Debug.LogError("CustomMapUtility:AudioHandler: Unity does not support more than 8 audio channels per file");
-                    return null;
+                    throw new NotSupportedException("Unity does not support more than 8 audio channels per file");
                 }
-                var audioClip = AudioClip.Create("BGM", (int)wav.SampleCount, wav.NumChannels, (int)wav.SampleRate, false);
+                var audioClip = AudioClip.Create("BGM", (int)wav.SampleCount, wav.NumChannels, (int)wav.SampleRate, stream: false);
                 audioClip.SetData(wav.InterleavedAudio, 0);
                 // File.Delete(path + ".wav");
-                Debug.Log("Parse Result: "+wav);
+                Debug.Log($"Parse Result: {wav}");
                 return audioClip;
             }
+            internal enum FileType {
+                unknown = -1,
+                wav = 0,
+                mp3 = 1,
+            }
         }
+        private static readonly Dictionary<string, Task> HeldTask = new Dictionary<string, Task>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, WeakReference<AudioClip>> HeldTheme = new Dictionary<string, WeakReference<AudioClip>>(StringComparer.Ordinal);
+        public static void SetEnemyTheme(string bgmName, bool immediate = false) {
+            LoadEnemyTheme(bgmName);
+            #pragma warning disable MA0003
+            if (!immediate) {
+                StartEnemyTheme(bgmName, false);
+            } else {
+                StartEnemyTheme(bgmName, true);
+            }
+            #pragma warning restore MA0003
+        }
+        public static void LoadEnemyTheme(string bgmName) {
+            if (HeldTask.ContainsKey(bgmName)) {
+                if (HeldTheme[bgmName].TryGetTarget(out AudioClip _)) {
+                    return;
+                }
+                HeldTheme.Remove(bgmName);
+            }
+            var task = Task.Run(() => {
+                if (!HeldTheme.ContainsKey(bgmName)) {
+                    HeldTheme[bgmName] = new WeakReference<AudioClip>(CustomBgmParse(bgmName));
+                }
+                if (!HeldTheme[bgmName].TryGetTarget(out AudioClip _)) {
+                    HeldTheme[bgmName].SetTarget(CustomBgmParse(bgmName));
+                }
+            });
+            Debug.Log($"CustomMapUtility:AudioHandler:Task: Holding EnemyTheme {bgmName}");
+            HeldTask[bgmName] = task;
+        }
+        public static void LoadEnemyTheme(string bgmName, out AudioClip clip) {
+            LoadEnemyTheme(bgmName);
+            HeldTheme[bgmName].TryGetTarget(out AudioClip temp);
+            clip = temp;
+        }
+        [Obsolete("Please call StartEnemyTheme(bgmName) intead")]
+        public static void StartEnemyTheme() {
+            var last = HeldTask.Last();
+            StartEnemyTheme(last.Key);
+        }
+        public static void StartEnemyTheme(string bgmName, bool immediate = true) {
+            var theme = GetAudioClip(bgmName);
+            SingletonBehavior<BattleSoundManager>.Instance.SetEnemyTheme(new AudioClip[]{theme});
+            if (immediate) {
+                SingletonBehavior<BattleSoundManager>.Instance.ChangeEnemyTheme(0);
+                Debug.Log($"CustomMapUtility:AudioHandler: Changed EnemyTheme to {bgmName} and enforced it");
+            } else {
+                Debug.Log($"CustomMapUtility:AudioHandler: Changed EnemyTheme to {bgmName}");
+            }
+        }
+        public static AudioClip GetEnemyTheme(string bgmName) => GetAudioClip(bgmName);
+        public static AudioClip GetAudioClip(string bgmName) {
+            if (!HeldTask.ContainsKey(bgmName)) {
+                if (!HeldTheme[bgmName].TryGetTarget(out AudioClip _)) {
+                    Debug.LogWarning("CustomMapUtility:AudioHandler: Theme was not already loaded, preload the theme with LoadEnemyTheme(bgmName) if possible");
+                    LoadEnemyTheme(bgmName);
+                }
+                Debug.LogWarning("CustomMapUtility:AudioHandler: Entry does not exist in held themes but existed in cache");
+            } else {
+                HeldTask.Remove(bgmName, out Task task);
+                task.Wait();
+            }
+            if (!HeldTheme[bgmName].TryGetTarget(out AudioClip theme)) {
+                Debug.LogWarning("CustomMapUtility:AudioHandler: Entry was dropped from memory, maybe it was held for too long? Reloading entry");
+                LoadEnemyTheme(bgmName);
+            }
+            Debug.Log($"CustomMapUtility:AudioHandler:Task: Got EnemyTheme {bgmName}");
+            return theme;
+        }
+
         public static void EnforceMap(int num = 0) {
             var emotionTotalCoinNumber = Singleton<StageController>.Instance.GetCurrentStageFloorModel().team.emotionTotalCoinNumber;
             Singleton<StageController>.Instance.GetCurrentWaveModel().team.emotionTotalBonus = emotionTotalCoinNumber + 1;
@@ -502,8 +591,9 @@ namespace CustomMapUtility {
             Singleton<StageController>.Instance.AddCustomEgoMapByAssimilation(mapName, faction, manager);
         }
         public static void RemoveCustomEgoMapByAssimilation(string name) {
-            // Singleton<StageController>.Instance.RemoveEgoMapByAssimilation(name);
-            Singleton<StageController>.Instance.RemoveEgoMapAll();
+            Singleton<StageController>.Instance.RemoveEgoMapByAssimilation(name);
+            // Singleton<StageController>.Instance.RemoveEgoMapAll();
+		    // SingletonBehavior<BattleSceneRoot>.Instance.RemoveEgoMapAll();
         }
     }
     public static class CustomMapUtilityExtensions {
@@ -515,16 +605,18 @@ namespace CustomMapUtility {
             }
             List<MapManager> addedMapList = Instance.GetType().GetField("_addedMapList", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(Instance) as List<MapManager>;
             MapChangeFilter mapChangeFilter = Instance.GetType().GetField("_mapChangeFilter", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(Instance) as MapChangeFilter;
-            MapManager x2 = (addedMapList != null) ? addedMapList.Find((MapManager x) => x.name.Contains(mapName)) : null;
+            MapManager x2 = addedMapList?.Find((MapManager x) => x.name.Contains(mapName));
             if (x2 == null && manager == null) {
                 Debug.LogError("CustomMapUtility: Ego map not initialized");
                 return;
-            } else if (x2 == null) {
+            }
+            if (x2 == null)
+            {
                 Debug.LogWarning("CustomMapUtility: Reinitializing Ego map");
-                CustomMapHandler.InitCustomMap(mapName, manager, true);
+                CustomMapHandler.InitCustomMap(mapName, manager, isEgo: true);
                 x2 = manager;
             }
-            mapChangeFilter.StartMapChangingEffect((Direction)Faction.Player, true);
+            mapChangeFilter.StartMapChangingEffect((Direction)faction, particleOn: true);
             x2.isBossPhase = false;
             x2.isEgo = true;
             if (x2 != Instance.currentMapObject)
@@ -532,7 +624,9 @@ namespace CustomMapUtility {
                 Instance.currentMapObject.EnableMap(false);
                 Instance.currentMapObject = x2;
                 if (!byAssimilationFlag) {
+                    #pragma warning disable MA0003
                     Instance.currentMapObject.ActiveMap(true);
+                    #pragma warning restore MA0003
                     Instance.currentMapObject.InitializeMap();
                 } else {
                     if (!Instance.currentMapObject.IsMapInitialized) {
@@ -540,14 +634,14 @@ namespace CustomMapUtility {
                     }
                     Instance.currentMapObject.EnableMap(true);
 			        Instance.currentMapObject.PlayMapChangedSound();
-                    SingletonBehavior<BattleCamManager>.Instance.SetVignetteColorBgCam(Instance.currentMapObject.sephirahColor, true);
+                    SingletonBehavior<BattleCamManager>.Instance.SetVignetteColorBgCam(Instance.currentMapObject.sephirahColor, active: true);
                     SingletonBehavior<BattleSoundManager>.Instance.SetEnemyTheme(Instance.currentMapObject.mapBgm);
                 }
                 return;
             }
             return;
         }
-        public static void ChangeToCustomEgoMapByAssimilation(this BattleSceneRoot Instance, string mapName, Faction faction = Faction.Player, MapManager manager = null) {
+        public static void ChangeToCustomEgoMapByAssimilation(this BattleSceneRoot _, string mapName, Faction faction = Faction.Player, MapManager manager = null) {
             Singleton<StageController>.Instance.AddCustomEgoMapByAssimilation(mapName, faction, manager);
         }
         public static void AddCustomEgoMapByAssimilation(this StageController Instance, string name, Faction faction = Faction.Player, MapManager manager = null) {
@@ -562,41 +656,42 @@ namespace CustomMapUtility {
             if (name != null && name != string.Empty)
             {
                 if (faction == Faction.Player) {
-                    SingletonBehavior<BattleSceneRoot>.Instance.ChangeToCustomEgoMap(name, faction, manager, true);
+                    SingletonBehavior<BattleSceneRoot>.Instance.ChangeToCustomEgoMap(name, faction, manager, byAssimilationFlag: true);
                 } else {
-                    SingletonBehavior<BattleSceneRoot>.Instance.ChangeToSpecialMap(name, true, false);
+                    SingletonBehavior<BattleSceneRoot>.Instance.ChangeToSpecialMap(name, playEffect: true, scaleChange: false);
                 }
             }
         }
         public static void RemoveCustomEgoMapByAssimilation(this StageController Instance, string name) {
-            // Instance.RemoveEgoMapByAssimilation(name);
-            Instance.RemoveEgoMapAll();
+            Instance.RemoveEgoMapByAssimilation(name);
+            // Instance.RemoveEgoMapAll();
+		    // SingletonBehavior<BattleSceneRoot>.Instance.RemoveEgoMapAll();
         }
-        public static void InitCustomMap(this BattleSceneRoot Instance, string stageName, MapManager manager) {
+        public static void InitCustomMap(this BattleSceneRoot _, string stageName, MapManager manager) {
             CustomMapHandler.InitCustomMap(stageName, manager);
         }
-        public static void InitCustomMap(this BattleSceneRoot Instance, string stageName, MapManager manager,
+        public static void InitCustomMap(this BattleSceneRoot _, string stageName, MapManager manager,
             bool isEgo = false) {
                 CustomMapHandler.InitCustomMap(stageName, manager, isEgo);
         }
-        public static void InitCustomMap(this BattleSceneRoot Instance, string stageName, MapManager manager,
+        public static void InitCustomMap(this BattleSceneRoot _, string stageName, MapManager manager,
             bool isEgo = false, bool initBGMs = true) {
                 CustomMapHandler.InitCustomMap(stageName, manager, isEgo, initBGMs);
         }
-        public static void InitCustomMap(this BattleSceneRoot Instance, string stageName, MapManager manager,
+        public static void InitCustomMap(this BattleSceneRoot _, string stageName, MapManager manager,
             float bgx = 0.5f, float bgy = 0.5f,
             float floorx = 0.5f, float floory = (407.5f/1080f),
             float underx = 0.5f, float undery = (300f/1080f)) {
                 CustomMapHandler.InitCustomMap(stageName, manager, bgx, bgy, floorx, floory, underx, undery);
         }
-        public static void InitCustomMap(this BattleSceneRoot Instance, string stageName, MapManager manager,
+        public static void InitCustomMap(this BattleSceneRoot _, string stageName, MapManager manager,
             bool isEgo = false,
             float bgx = 0.5f, float bgy = 0.5f,
             float floorx = 0.5f, float floory = (407.5f/1080f),
             float underx = 0.5f, float undery = (300f/1080f)) {
                 CustomMapHandler.InitCustomMap(stageName, manager, isEgo, bgx, bgy, floorx, floory, underx, undery);
         }
-        public static void InitCustomMap(this BattleSceneRoot Instance, string stageName, MapManager manager,
+        public static void InitCustomMap(this BattleSceneRoot _, string stageName, MapManager manager,
             bool isEgo = false, bool initBGMs = true,
             float bgx = 0.5f, float bgy = 0.5f,
             float floorx = 0.5f, float floory = (407.5f/1080f),
@@ -623,7 +718,9 @@ namespace CustomMapUtility {
             foreach (var prefab in scratchPrefabs) {
                 DestroyObject(prefab);
             }
+            #pragma warning disable MA0003
             SingletonBehavior<BattleCamManager>.Instance.BlurBackgroundCam(true);
+            #pragma warning restore MA0003
             Debug.Log("CustomMapUtility: Cleaned up custom objects");
             base.ResetMap();
         }
@@ -647,7 +744,9 @@ namespace CustomMapUtility {
             foreach (var prefab in scratchPrefabs) {
                 DestroyObject(prefab);
             }
+            #pragma warning disable MA0003
             SingletonBehavior<BattleCamManager>.Instance.BlurBackgroundCam(true);
+            #pragma warning restore MA0003
             Debug.Log("CustomMapUtility: Cleaned up custom objects");
             base.ResetMap();
         }

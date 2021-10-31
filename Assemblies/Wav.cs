@@ -1,7 +1,10 @@
 ﻿using System;
 using System.IO;
+using System.Runtime.InteropServices;
+using UnityEngine;
 
 namespace CustomMapUtility {
+    [StructLayout(LayoutKind.Sequential, Pack=1)]
     public readonly struct Wav {
         private static float BytesToFloat(byte firstByte, byte secondByte)
         {
@@ -9,19 +12,34 @@ namespace CustomMapUtility {
             return num / 32768f;
         }
         private static Stream FileToStream(string file) {
-            using (FileStream fs = File.OpenRead(file)) {
-                return fs;
-            }
+            return File.OpenRead(file);
         }
         private static Stream BytesToStream(byte[] bytes) {
             return new MemoryStream(bytes);
         }
         private readonly BinaryReader BinReader;
+        
+        [StructLayout(LayoutKind.Sequential, Pack=1)]
         public readonly struct RIFF {
             public RIFF(BinaryReader BinReader) {
                 ChunkID = BinReader.ReadUInt32();
                 if (ChunkID != 1179011410u) {
-                    throw new Exception("Starting Header isn't RIFF, audio file is probably corrupt");
+                    Debug.LogWarning("Starting Header isn't RIFF, audio file is probably corrupt");
+                    Debug.LogWarning("Should be ("+1179011410u+") but it's ("+ChunkID+")");
+                    try {
+                        ushort check;
+                        retry:
+                        do {
+                            check = BinReader.ReadUInt16();
+                        } while (check != 18770u);
+                        if (BinReader.ReadUInt16() != 17990u) {
+                            goto retry;
+                        }
+                        BinReader.BaseStream.Seek(-8, SeekOrigin.Current);
+                        ChunkID = BinReader.ReadUInt32();
+                    } catch (EndOfStreamException) {
+                        Debug.LogError("Invalid audio file");
+                    }
                 }
                 ChunkSize = BinReader.ReadUInt32();
                 Format = BinReader.ReadUInt32();
@@ -30,9 +48,11 @@ namespace CustomMapUtility {
             public readonly uint ChunkSize; // Offset: 4
             public readonly uint Format; // Offset: 8
         }
-        public readonly struct fmt {
-            public fmt(BinaryReader BinReader) {
+        [StructLayout(LayoutKind.Sequential, Pack=1)]
+        public readonly struct Fmt {
+            public Fmt(BinaryReader BinReader) {
                 ushort check;
+                
                 retry:
                 do {
                     check = BinReader.ReadUInt16();
@@ -40,6 +60,7 @@ namespace CustomMapUtility {
                 if (BinReader.ReadUInt16() != 8308) {
                     goto retry;
                 }
+                
                 BinReader.BaseStream.Seek(-4, SeekOrigin.Current);
                 Subchunk1ID = BinReader.ReadUInt32();
                 Subchunk1Size = BinReader.ReadUInt32();
@@ -54,7 +75,7 @@ namespace CustomMapUtility {
                     ExtraParams = BinReader.ReadBytes((int)ExtraParamSize);
                 } else {
                     ExtraParamSize = null;
-                    ExtraParams = new byte[0];
+                    ExtraParams = new byte[1];
                 }
             }
             public readonly uint Subchunk1ID; // Offset: 12
@@ -303,7 +324,7 @@ namespace CustomMapUtility {
                 Unknown = 0xe708,
                 Free_Lossless_Audio_Codec_FLAC = 0xf1ac,
                 Extensible = 0xfffe,
-                Development = 0xffff
+                Development = 0xffff,
             }
             public readonly ushort NumChannels; // Offset: 22
             public readonly uint SampleRate; // Offset: 24
@@ -313,8 +334,9 @@ namespace CustomMapUtility {
             public readonly ushort? ExtraParamSize; // Offset: 36?
             public readonly byte[] ExtraParams; // Offset: ?
         }
-        public readonly struct data {
-            public data(BinaryReader BinReader) {
+        [StructLayout(LayoutKind.Sequential, Pack=1)]
+        public readonly struct Data {
+            public Data(BinaryReader BinReader) {
                 ushort check;
                 retry:
                 do {
@@ -326,19 +348,19 @@ namespace CustomMapUtility {
                 BinReader.BaseStream.Seek(-4, SeekOrigin.Current);
                 Subchunk2ID = BinReader.ReadUInt32();
                 Subchunk2Size = BinReader.ReadUInt32();
-                Data = BinReader.ReadBytes((int)Subchunk2Size);
+                data = BinReader.ReadBytes((int)Subchunk2Size);
             }
             public readonly uint Subchunk2ID; // Offset: 36
             public readonly uint Subchunk2Size; // Offset: 40
-            public readonly byte[] Data; // Offset: 44
+            public readonly byte[] data; // Offset: 44
         }
         public Wav(string filename) : this(FileToStream(filename)) {}
         public Wav(byte[] wav) : this(BytesToStream(wav)) {}
         public Wav(Stream wav) {
             BinReader = new BinaryReader(wav);
             riffBlock = new RIFF(BinReader);
-            fmtBlock = new fmt(BinReader);
-            dataBlock = new data(BinReader);
+            fmtBlock = new Fmt(BinReader);
+            dataBlock = new Data(BinReader);
             
             var bytesPerSample = fmtBlock.BitsPerSample/8u;
 
@@ -348,11 +370,11 @@ namespace CustomMapUtility {
             var channel = 0;
             int[] iteration = new int[3];
             var total = dataBlock.Subchunk2Size;
-            if (this.BytesPerSample != 2) {
+            if (bytesPerSample != 2) {
                 throw new NotImplementedException("Wav reader currently only supports 16 bit PCM");
             }
-            for (var i = 0; i < total; i += (int)this.BytesPerSample) {
-                float audioData = BytesToFloat(dataBlock.Data[i], dataBlock.Data[i+1]);
+            for (var i = 0; i < total; i += (int)bytesPerSample) {
+                float audioData = BytesToFloat(dataBlock.data[i], dataBlock.data[i+1]);
                 if (channel == 0) {
                     LeftChannel[iteration[0]] = audioData;
                     iteration[0]++;
@@ -370,8 +392,8 @@ namespace CustomMapUtility {
             BinReader.Dispose();
         }
         public readonly RIFF riffBlock;
-        public readonly fmt fmtBlock;
-        public readonly data dataBlock;
+        public readonly Fmt fmtBlock;
+        public readonly Data dataBlock;
 
         public readonly float[] LeftChannel;
         public readonly float[] RightChannel;
@@ -383,7 +405,7 @@ namespace CustomMapUtility {
         public uint SampleRate {get {return this.fmtBlock.SampleRate;}}
         public uint BytesPerSample {get {return this.fmtBlock.BitsPerSample/8u;}}
         public uint SampleCount {get {return FileSize_Audio/BytesPerSample/NumChannels;}}
-        public fmt.Tag AudioFormat {get {return (fmt.Tag)this.fmtBlock.AudioFormat;}}
+        public Fmt.Tag AudioFormat {get {return (Fmt.Tag)this.fmtBlock.AudioFormat;}}
 
         public override string ToString()
         {
@@ -393,7 +415,7 @@ namespace CustomMapUtility {
                 this.FileSize,
                 this.SampleRate,
                 this.SampleCount,
-                this.AudioFormat
+                this.AudioFormat,
             });
         }
     }

@@ -2,6 +2,8 @@
 
 Use by requiring ConfigAPI and referencing the DLL for auto updates, or by dropping the cs files in Assembly into your own project and add using CustomMapUtility to your namespace references.
 
+Just credit me in the description or leave a link to the tool if you use CustomMapUtility
+
 Requires NAudio 1.85
 
 Documentation is in-progress, basic usage is detailed in Template.cs

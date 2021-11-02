@@ -293,7 +293,7 @@ namespace CustomMapUtility {
 
         public class ModResources {
             public class CacheInit : ModInitializer {
-                const string version = "1.0.0";
+                const string version = "1.0.1";
                 public override void OnInitializeMod()
                 {
                     var tempInstance = new ModResources();
@@ -508,7 +508,7 @@ namespace CustomMapUtility {
         }
         private static readonly Dictionary<string, Task> HeldTask = new Dictionary<string, Task>(StringComparer.Ordinal);
         private static readonly Dictionary<string, WeakReference<AudioClip>> HeldTheme = new Dictionary<string, WeakReference<AudioClip>>(StringComparer.Ordinal);
-        public static void SetEnemyTheme(string bgmName, bool immediate = false) {
+        public static void SetEnemyTheme(string bgmName, bool immediate = true) {
             LoadEnemyTheme(bgmName);
             #pragma warning disable MA0003
             if (!immediate) {
@@ -574,6 +574,21 @@ namespace CustomMapUtility {
             }
             Debug.Log($"CustomMapUtility:AudioHandler:Task: Got EnemyTheme {bgmName}");
             return theme;
+        }
+        public static void SetMapBgm(string bgmName, bool immediate = true) {
+            LoadEnemyTheme(bgmName);
+            SingletonBehavior<BattleSceneRoot>.Instance.currentMapObject.mapBgm = new AudioClip[]{GetAudioClip(bgmName)};
+            SingletonBehavior<BattleSoundManager>.Instance.SetEnemyTheme(SingletonBehavior<BattleSceneRoot>.Instance.currentMapObject.mapBgm);
+            if (immediate) {
+                SingletonBehavior<BattleSoundManager>.Instance.ChangeEnemyTheme(0);
+            }
+        }
+        public static void LoadMapBgm(string bgmName, bool immediate = true) {
+            SingletonBehavior<BattleSceneRoot>.Instance.currentMapObject.mapBgm = new AudioClip[]{GetAudioClip(bgmName)};
+            SingletonBehavior<BattleSoundManager>.Instance.SetEnemyTheme(SingletonBehavior<BattleSceneRoot>.Instance.currentMapObject.mapBgm);
+            if (immediate) {
+                SingletonBehavior<BattleSoundManager>.Instance.ChangeEnemyTheme(0);
+            }
         }
 
         public static void EnforceMap(int num = 0) {

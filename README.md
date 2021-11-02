@@ -8,6 +8,7 @@ Requires NAudio 1.85
 
 Documentation is in-progress, basic usage is detailed in Template.cs
 You can find info over at https://github.com/uGuardian/LoR_CustomMapUtility/wiki/Adding-invitation-maps
+
 The Resources folder is included in your own mod, rename Template to your map name and include whichever image files you need. Only Background and Floor are required.
 
 Can be used as a psuedo sound file loader, proper as one coming soon.

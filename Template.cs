@@ -3,7 +3,7 @@ using CustomMapUtility;
 namespace Template {
     public class EnemyTeamStageManager_Template : EnemyTeamStageManager {
         public override void OnWaveStart() {
-            // This method must be called somewhere, and only once. StageManager or Passive in the OnWaveStart() method is reccomended.
+            // This method must be called somewhere, and only once. StageManager or Passive in the OnWaveStart() method is recommended.
             // You MUST have <MapInfo>Template</MapInfo> inside your StageInfo.xml file. (Replace Template with your stage name)
             
             // When you call this method, you supply the stage name and then your map manager.

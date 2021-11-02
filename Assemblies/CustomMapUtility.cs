@@ -607,8 +607,6 @@ namespace CustomMapUtility {
         }
         public static void RemoveCustomEgoMapByAssimilation(string name) {
             Singleton<StageController>.Instance.RemoveEgoMapByAssimilation(name);
-            // Singleton<StageController>.Instance.RemoveEgoMapAll();
-		    // SingletonBehavior<BattleSceneRoot>.Instance.RemoveEgoMapAll();
         }
     }
     public static class CustomMapUtilityExtensions {
@@ -679,8 +677,6 @@ namespace CustomMapUtility {
         }
         public static void RemoveCustomEgoMapByAssimilation(this StageController Instance, string name) {
             Instance.RemoveEgoMapByAssimilation(name);
-            // Instance.RemoveEgoMapAll();
-		    // SingletonBehavior<BattleSceneRoot>.Instance.RemoveEgoMapAll();
         }
         public static void InitCustomMap(this BattleSceneRoot _, string stageName, MapManager manager) {
             CustomMapHandler.InitCustomMap(stageName, manager);

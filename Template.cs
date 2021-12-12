@@ -22,12 +22,5 @@ namespace Template {
                 return new string[] {"MyBGM.mp3"};
             }
         }
-        public override void InitializeMap()
-        {
-            base.InitializeMap();
-            // This makes the map not have the sephirah filter
-            sephirahType = SephirahType.None;
-            sephirahColor = Color.black;
-        }
     }
 }

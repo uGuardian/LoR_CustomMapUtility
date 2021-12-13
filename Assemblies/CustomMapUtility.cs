@@ -311,19 +311,19 @@ namespace CustomMapUtility {
 
         public static class ModResources {
             public class CacheInit : ModInitializer {
-                public const string version = "1.2.1";
+                public const string version = "1.2.2";
                 public override void OnInitializeMod()
                 {
-                    if (string.Equals(Assembly.GetExecutingAssembly().GetName().Name, "ConfigAPI", StringComparison.Ordinal)) {
+                    if (!string.Equals(Assembly.GetExecutingAssembly().GetName().Name, "ConfigAPI", StringComparison.Ordinal)) {
+                        var curDir = new DirectoryInfo(Assembly.GetExecutingAssembly().Location + "\\..\\..");
+                        Debug.Log($"CustomMapUtility Version \"{version}\" in Local Mode at {curDir.FullName}");
+                        _dirInfos = new DirectoryInfo[] { curDir };
+                    } else {
                         _dirInfos =
                             from modInfo in ModContentInfoLoader.LoadAllModInfos()
-                            // where modInfo.activated == true
+                                // where modInfo.activated == true
                             select modInfo.dirInfo;
                         Debug.Log($"CustomMapUtility Version \"{version}\" in Global Mode");
-                    } else {
-                        var curDir = new DirectoryInfo(Assembly.GetExecutingAssembly().Location+"\\..\\..");
-                        Debug.Log($"CustomMapUtility Version \"{version}\" in Local Mode at {curDir.FullName}");
-                        _dirInfos = new DirectoryInfo[]{curDir};
                     }
                     _stagePaths = GetStageRootPaths();
                     _bgms = GetStageBgmInfos();
@@ -403,7 +403,8 @@ namespace CustomMapUtility {
                     }
                     bgmsPath = new DirectoryInfo(Path.Combine(dir.FullName, "Resource/StageBgm"));
                     if (bgmsPath.Exists) {
-                        Debug.LogWarning($"CustomMapUtility: StageBgm folder is now obselete, please use CustomAudio folder instead.");
+                        Debug.LogWarning("CustomMapUtility: StageBgm folder is now obselete, please use CustomAudio folder instead.");
+                        Singleton<ModContentManager>.Instance.GetErrorLogs().Add($"<color=yellow>(pid: {Assembly.GetExecutingAssembly().GetName().Name}) CustomMapUtility: StageBgm folder is now obselete, please use CustomAudio folder instead.</color>");
                         foreach (FileInfo file in bgmsPath.GetFiles()) {
                             bgms.Add(file);
                         }
@@ -607,7 +608,7 @@ namespace CustomMapUtility {
                 }
                 #if !NOMP3
                 if (format == AudioType.MPEG) {
-                    Debug.Log("CustomMapUtility:AudioHandler: Falling back to NAudio and Custom WAV");
+                    Debug.LogWarning("CustomMapUtility:AudioHandler: Falling back to NAudio and Custom WAV");
                     WAV wav;
                     using (var sourceProvider = new Mp3FileReader(path)) {
                         MemoryStream stream = new MemoryStream();

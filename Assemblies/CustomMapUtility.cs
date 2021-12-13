@@ -311,7 +311,7 @@ namespace CustomMapUtility {
 
         public static class ModResources {
             public class CacheInit : ModInitializer {
-                public const string version = "1.2.0";
+                public const string version = "1.2.1";
                 public override void OnInitializeMod()
                 {
                     if (string.Equals(Assembly.GetExecutingAssembly().GetName().Name, "ConfigAPI", StringComparison.Ordinal)) {
@@ -565,7 +565,7 @@ namespace CustomMapUtility {
                             break;
                         }
                         default: {
-                            Debug.LogError("CustomMapUtility: AudioHandler: File type unknown");
+                            Debug.LogError("CustomMapUtility:AudioHandler: File type unknown");
                             break;
                         }
                     }
@@ -607,7 +607,7 @@ namespace CustomMapUtility {
                 }
                 #if !NOMP3
                 if (format == AudioType.MPEG) {
-                    Debug.Log("CustomMapUtility: AudioHandler: Falling back to NAudio and Custom WAV");
+                    Debug.Log("CustomMapUtility:AudioHandler: Falling back to NAudio and Custom WAV");
                     WAV wav;
                     using (var sourceProvider = new Mp3FileReader(path)) {
                         MemoryStream stream = new MemoryStream();
@@ -632,7 +632,7 @@ namespace CustomMapUtility {
             }
         }
         private static readonly Dictionary<string, Task> HeldTask = new Dictionary<string, Task>(StringComparer.Ordinal);
-        // Legacy cache implementation that's a pain to change and acts as a near-zero overhead backup.
+        // Legacy cache implementation that's a pain to change and acts as a near-zero overhead redundancy.
         private static readonly Dictionary<string, WeakReference<AudioClip>> HeldTheme = new Dictionary<string, WeakReference<AudioClip>>(StringComparer.Ordinal);
         private class AudioCache : MonoBehaviour {
             #pragma warning disable IDE0051
@@ -671,7 +671,7 @@ namespace CustomMapUtility {
                 HeldTask.Remove(bgmName);
             }
             clip = CustomBgmParse(bgmName);
-            Debug.Log($"CustomMapUtility:AudioHandler:Task: Loaded EnemyTheme {bgmName}");
+            Debug.Log($"CustomMapUtility:AudioHandler: Loaded EnemyTheme {bgmName}");
         }
         [Obsolete("Please use StartEnemyTheme(bgmName) intead")]
         public static void StartEnemyTheme() {
@@ -707,6 +707,7 @@ namespace CustomMapUtility {
             Debug.Log($"CustomMapUtility:AudioHandler:Task: Got EnemyTheme {bgmName}");
             return theme;
         }
+        [Obsolete("Please use SetMapBgm(string, bool, string) instead")]
         public static void SetMapBgm(string bgmName, bool immediate = true) {
 
             LoadEnemyTheme(bgmName, out var clip);
@@ -716,11 +717,59 @@ namespace CustomMapUtility {
                 SingletonBehavior<BattleSoundManager>.Instance.ChangeEnemyTheme(0);
             }
         }
-        [Obsolete("Please use SetMapBgm(string, bool) instead")]
+        public static void SetMapBgm(string bgmName, bool immediate = true, string mapName = null) {
+            LoadEnemyTheme(bgmName, out var clip);
+            var clips = new AudioClip[]{clip};
+            MapManager manager;
+            if (mapName == null) {
+                Debug.LogWarning("CustomMapUtility:AudioHandler: Setting sephirah map's BGM");
+                if (SingletonBehavior<BattleSceneRoot>.Instance.mapList != null) {
+                    manager = SingletonBehavior<BattleSceneRoot>.Instance.mapList.Find((MapManager x) => x.sephirahType == Singleton<StageController>.Instance.CurrentFloor);
+                    manager.mapBgm = clips;
+                } else {return;}
+            } else {
+                List<MapManager> addedMapList = SingletonBehavior<BattleSceneRoot>.Instance.GetType().GetField("_addedMapList", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(SingletonBehavior<BattleSceneRoot>.Instance) as List<MapManager>;
+                manager = addedMapList?.Find((MapManager x) => x.name.Contains(mapName));
+                if (manager == null) {
+                    Debug.LogError("CustomMapUtility:AudioHandler: Map not initialized");
+                    return;
+                }
+                manager.mapBgm = clips;
+            }
+            SingletonBehavior<BattleSoundManager>.Instance.SetEnemyTheme(clips);
+            if (immediate) {
+                SingletonBehavior<BattleSoundManager>.Instance.ChangeEnemyTheme(0);
+            }
+        }
+        [Obsolete("Please use SetMapBgm(string, bool, string) instead")]
         public static void LoadMapBgm(string bgmName, bool immediate = true) => SetMapBgm(bgmName, immediate);
+        [Obsolete("Please use StartMapBgm(string, bool, string) instead")]
         public static void StartMapBgm(string bgmName, bool immediate = true) {
             SingletonBehavior<BattleSceneRoot>.Instance.currentMapObject.mapBgm = new AudioClip[]{GetAudioClip(bgmName)};
             SingletonBehavior<BattleSoundManager>.Instance.SetEnemyTheme(SingletonBehavior<BattleSceneRoot>.Instance.currentMapObject.mapBgm);
+            if (immediate) {
+                SingletonBehavior<BattleSoundManager>.Instance.ChangeEnemyTheme(0);
+            }
+        }
+        public static void StartMapBgm(string bgmName, bool immediate = true, string mapName = null) {
+            var clips = new AudioClip[]{GetAudioClip(bgmName)};
+            MapManager manager;
+            if (mapName == null) {
+                Debug.LogWarning("CustomMapUtility:AudioHandler: Setting sephirah map's BGM");
+                if (SingletonBehavior<BattleSceneRoot>.Instance.mapList != null) {
+                    manager = SingletonBehavior<BattleSceneRoot>.Instance.mapList.Find((MapManager x) => x.sephirahType == Singleton<StageController>.Instance.CurrentFloor);
+                    manager.mapBgm = clips;
+                } else {return;}
+            } else {
+                List<MapManager> addedMapList = SingletonBehavior<BattleSceneRoot>.Instance.GetType().GetField("_addedMapList", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(SingletonBehavior<BattleSceneRoot>.Instance) as List<MapManager>;
+                manager = addedMapList?.Find((MapManager x) => x.name.Contains(mapName));
+                if (manager == null) {
+                    Debug.LogError("CustomMapUtility:AudioHandler: Map not initialized");
+                    return;
+                }
+                manager.mapBgm = clips;
+            }
+            SingletonBehavior<BattleSoundManager>.Instance.SetEnemyTheme(clips);
             if (immediate) {
                 SingletonBehavior<BattleSoundManager>.Instance.ChangeEnemyTheme(0);
             }

@@ -6,6 +6,9 @@ using System.Reflection;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
+#if !NOMP3
+using NAudio.Wave;
+#endif
 using Mod;
 #pragma warning disable MA0048,MA0016,MA0051
 
@@ -308,7 +311,7 @@ namespace CustomMapUtility {
 
         public static class ModResources {
             public class CacheInit : ModInitializer {
-                public const string version = "1.1.0";
+                public const string version = "1.2.0";
                 public override void OnInitializeMod()
                 {
                     if (string.Equals(Assembly.GetExecutingAssembly().GetName().Name, "ConfigAPI", StringComparison.Ordinal)) {
@@ -340,6 +343,7 @@ namespace CustomMapUtility {
                         bgmsDebug += Environment.NewLine+"}";
                         Debug.Log(bgmsDebug);
                     }
+                    Singleton<ModContentManager>.Instance.GetErrorLogs().RemoveAll(x => x.Contains("NAudio"));
                 }
             }
             public static string GetStagePath(string stageName) {
@@ -391,8 +395,15 @@ namespace CustomMapUtility {
                 }
                 List<FileInfo> bgms = new List<FileInfo>();
                 foreach (DirectoryInfo dir in _dirInfos) {
-                    DirectoryInfo bgmsPath = new DirectoryInfo(Path.Combine(dir.FullName, "Resource\\StageBgm"));
+                    DirectoryInfo bgmsPath = new DirectoryInfo(Path.Combine(dir.FullName, "Resource/CustomAudio"));
                     if (bgmsPath.Exists) {
+                        foreach (FileInfo file in bgmsPath.GetFiles()) {
+                            bgms.Add(file);
+                        }
+                    }
+                    bgmsPath = new DirectoryInfo(Path.Combine(dir.FullName, "Resource/StageBgm"));
+                    if (bgmsPath.Exists) {
+                        Debug.LogWarning($"CustomMapUtility: StageBgm folder is now obselete, please use CustomAudio folder instead.");
                         foreach (FileInfo file in bgmsPath.GetFiles()) {
                             bgms.Add(file);
                         }
@@ -414,7 +425,7 @@ namespace CustomMapUtility {
                 }
                 List<DirectoryInfo> paths = new List<DirectoryInfo>();
                 foreach (DirectoryInfo dir in _dirInfos) {
-                    DirectoryInfo stagePath = new DirectoryInfo(Path.Combine(dir.FullName, "Resource\\Stage"));
+                    DirectoryInfo stagePath = new DirectoryInfo(Path.Combine(dir.FullName, "Resource/Stage"));
                     if (stagePath.Exists) {
                         paths.Add(stagePath);
                     }
@@ -470,14 +481,27 @@ namespace CustomMapUtility {
         }
         private static AudioClip[] CustomBgmParse(string[] BGMs) {
             var files = ModResources.GetStageBgmInfos(BGMs);
+            if (CurrentCache == null) {
+                CurrentCache = SingletonBehavior<BattleScene>.Instance.gameObject.GetComponent<AudioCache>();
+                if (CurrentCache == null) {
+                    CurrentCache = SingletonBehavior<BattleScene>.Instance.gameObject.AddComponent<AudioCache>();
+                }
+            }
             AudioClip[] output = new AudioClip[BGMs.Length];
             var handler = new AudioHandler();
             for (int i = 0; i < BGMs.Length; i++) {
+                if (HeldTask.ContainsKey(BGMs[i])) {
+                    if (HeldTheme[BGMs[i]].TryGetTarget(out AudioClip clip)) {
+                        output[i] = clip;
+                        CurrentCache.Dictionary[BGMs[i]] = clip;
+                        continue;
+                    }
+                    HeldTheme.Remove(BGMs[i]);
+                }
                 try {
                     var info = files[i];
                     AudioType format = AudioType.UNKNOWN;
                     Debug.Log($"CustomMapUtility: BGM{i} = {BGMs[i]}");
-                    Debug.LogError(info.Extension);
                     switch (info.Extension.ToUpperInvariant()) {
                         case ".WAVE":
                         case ".WAV": {
@@ -508,8 +532,6 @@ namespace CustomMapUtility {
                         case ".M4A":
                         case ".AAC": {
                             format = AudioType.ACC;
-                            // throw new NotSupportedException("ACC audio type not supported");
-                            Debug.LogError("CustomMapUtility: AudioHandler: ACC audio type not supported");
                             break;
                         }
                         case ".AIF":
@@ -547,7 +569,10 @@ namespace CustomMapUtility {
                             break;
                         }
                     }
-                    output[i] = handler.Parse(files[i].FullName, format);
+                    var clip = handler.Parse(files[i].FullName, format);
+                    output[i] = clip;
+                    CurrentCache.Dictionary[BGMs[i]] = clip;
+                    HeldTheme[BGMs[i]] = new WeakReference<AudioClip>(clip);
                 } catch (Exception ex) {
                     Debug.LogException(ex);
                     output[i] = null;
@@ -560,7 +585,7 @@ namespace CustomMapUtility {
                 if (format == AudioType.WAV) {
                     // return ParseWAV(path);
                 }
-                using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip("file://" + path, format))
+                using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip($"file://{path}", format))
                 {
                     var request = www.SendWebRequest();
 
@@ -574,30 +599,58 @@ namespace CustomMapUtility {
                     }
                     else
                     {
-                        return DownloadHandlerAudioClip.GetContent(www);
+                        var clip = DownloadHandlerAudioClip.GetContent(www);
+                        if (clip != null) {
+                            return clip;
+                        }
                     }
                 }
+                #if !NOMP3
+                if (format == AudioType.MPEG) {
+                    Debug.Log("CustomMapUtility: AudioHandler: Falling back to NAudio and Custom WAV");
+                    WAV wav;
+                    using (var sourceProvider = new Mp3FileReader(path)) {
+                        MemoryStream stream = new MemoryStream();
+                        WaveFileWriter.WriteWavFileToStream(stream, sourceProvider);
+                        wav = new WAV(stream.ToArray());
+                        return ParseWAV(wav);
+                    }
+                }
+                #endif
+                return null;
             }
-            // private AudioClip ParseWAV(string path)
-            // {
-            //     Wav wav = new Wav(path);
-            //     if (wav.NumChannels > 8) {
-            //         throw new NotSupportedException("Unity does not support more than 8 audio channels per file");
-            //     }
-            //     var audioClip = AudioClip.Create("BGM", (int)wav.SampleCount, wav.NumChannels, (int)wav.SampleRate, stream: false);
-            //     audioClip.SetData(wav.InterleavedAudio, 0);
-            //     Debug.Log($"Parse Result: {wav}");
-            //     return audioClip;
-            // }
+            private AudioClip ParseWAV(string path) => ParseWAV(new WAV(path));
+            private AudioClip ParseWAV(WAV wav)
+            {
+                if (wav.NumChannels > 8) {
+                    throw new NotSupportedException("Unity does not support more than 8 audio channels per file");
+                }
+                var audioClip = AudioClip.Create("BGM", (int)wav.SampleCount, wav.NumChannels, (int)wav.SampleRate, stream: false);
+                audioClip.SetData(wav.InterleavedAudio, 0);
+                Debug.Log($"Parse Result: {wav}");
+                return audioClip;
+            }
         }
         private static readonly Dictionary<string, Task> HeldTask = new Dictionary<string, Task>(StringComparer.Ordinal);
+        // Legacy cache implementation that's a pain to change and acts as a near-zero overhead backup.
         private static readonly Dictionary<string, WeakReference<AudioClip>> HeldTheme = new Dictionary<string, WeakReference<AudioClip>>(StringComparer.Ordinal);
+        private class AudioCache : MonoBehaviour {
+            #pragma warning disable IDE0051
+            void OnDisable() {
+                Dictionary.Clear();
+            }
+            public readonly Dictionary<string, AudioClip> Dictionary = new Dictionary<string, AudioClip>(StringComparer.Ordinal);
+            #pragma warning restore IDE0051
+        }
+        private static AudioCache CurrentCache = null;
         public static void SetEnemyTheme(string bgmName, bool immediate = true) {
-            LoadEnemyTheme(bgmName);
-            if (!immediate) {
-                StartEnemyTheme(bgmName, false);
+            LoadEnemyTheme(bgmName, out var theme);
+            SingletonBehavior<BattleSoundManager>.Instance.SetEnemyTheme(new AudioClip[]{theme});
+            if (immediate) {
+                SingletonBehavior<BattleSoundManager>.Instance.ChangeEnemyTheme(0);
+                Debug.Log($"CustomMapUtility:AudioHandler: Changed EnemyTheme to {bgmName} and enforced it");
             } else {
-                StartEnemyTheme(bgmName, true);
+                Debug.Log($"CustomMapUtility:AudioHandler: Changed EnemyTheme to {bgmName}");
             }
         }
         public static void LoadEnemyTheme(string bgmName) {
@@ -608,20 +661,17 @@ namespace CustomMapUtility {
                 HeldTheme.Remove(bgmName);
             }
             var task = Task.Run(() => {
-                if (!HeldTheme.ContainsKey(bgmName)) {
-                    HeldTheme[bgmName] = new WeakReference<AudioClip>(CustomBgmParse(bgmName));
-                }
-                if (!HeldTheme[bgmName].TryGetTarget(out AudioClip _)) {
-                    HeldTheme[bgmName].SetTarget(CustomBgmParse(bgmName));
-                }
+                CustomBgmParse(bgmName);
             });
             Debug.Log($"CustomMapUtility:AudioHandler:Task: Holding EnemyTheme {bgmName}");
             HeldTask[bgmName] = task;
         }
         public static void LoadEnemyTheme(string bgmName, out AudioClip clip) {
-            LoadEnemyTheme(bgmName);
-            HeldTheme[bgmName].TryGetTarget(out AudioClip temp);
-            clip = temp;
+            if (HeldTask.ContainsKey(bgmName)) {
+                HeldTask.Remove(bgmName);
+            }
+            clip = CustomBgmParse(bgmName);
+            Debug.Log($"CustomMapUtility:AudioHandler:Task: Loaded EnemyTheme {bgmName}");
         }
         [Obsolete("Please use StartEnemyTheme(bgmName) intead")]
         public static void StartEnemyTheme() {
@@ -658,8 +708,13 @@ namespace CustomMapUtility {
             return theme;
         }
         public static void SetMapBgm(string bgmName, bool immediate = true) {
-            LoadEnemyTheme(bgmName);
-            StartMapBgm(bgmName, immediate);
+
+            LoadEnemyTheme(bgmName, out var clip);
+            SingletonBehavior<BattleSceneRoot>.Instance.currentMapObject.mapBgm = new AudioClip[]{clip};
+            SingletonBehavior<BattleSoundManager>.Instance.SetEnemyTheme(SingletonBehavior<BattleSceneRoot>.Instance.currentMapObject.mapBgm);
+            if (immediate) {
+                SingletonBehavior<BattleSoundManager>.Instance.ChangeEnemyTheme(0);
+            }
         }
         [Obsolete("Please use SetMapBgm(string, bool) instead")]
         public static void LoadMapBgm(string bgmName, bool immediate = true) => SetMapBgm(bgmName, immediate);

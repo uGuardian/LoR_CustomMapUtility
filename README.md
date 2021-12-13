@@ -4,7 +4,7 @@ Use by requiring ConfigAPI and referencing the DLL for auto updates, or by dropp
 
 Just credit me in the description or leave a link to the tool if you use CustomMapUtility
 
-Requires NAudio 1.85
+Requires NAudio 1.85 OR needs the NOMP3 compilation symbol defined.
 
 Documentation is in-progress, basic usage is detailed in Template.cs
 You can find info over at https://github.com/uGuardian/LoR_CustomMapUtility/wiki/Adding-invitation-maps

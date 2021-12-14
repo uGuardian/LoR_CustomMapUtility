@@ -531,7 +531,7 @@ namespace CustomMapUtility {
                     }
                     bgmsPath = new DirectoryInfo(Path.Combine(dir.FullName, "Resource/StageBgm"));
                     if (bgmsPath.Exists) {
-                        Debug.LogWarning("CustomMapUtility: StageBgm folder is now obselete, please use CustomAudio folder instead.");
+                        Debug.LogWarning("CustomMapUtility: StageBgm folder is now obsolete, please use CustomAudio folder instead.");
                         Singleton<ModContentManager>.Instance.GetErrorLogs().Add($"<color=yellow>(assembly: {Assembly.GetExecutingAssembly().GetName().Name}) CustomMapUtility: StageBgm folder is now obselete, please use CustomAudio folder instead.</color>");
                         foreach (FileInfo file in bgmsPath.GetFiles()) {
                             bgms.Add(file);

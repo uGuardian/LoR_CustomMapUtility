@@ -25,6 +25,9 @@ namespace CustomMapUtility {
     /// </summary>
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
     public readonly struct Offsets {
+        /// <summary>
+        /// Contains a set of image offsets ranging from 0 to 1 for initializing the stage
+        /// </summary>
         /// <param name="bgOffsetX">Background x pivot</param>
         /// <param name="bgOffsetY">Background y pivot</param>
         /// <param name="floorOffsetX">Floor x pivot</param>

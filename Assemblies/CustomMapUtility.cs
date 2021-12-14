@@ -311,11 +311,12 @@ namespace CustomMapUtility {
 
         public static class ModResources {
             public class CacheInit : ModInitializer {
-                public const string version = "1.2.2";
+                public const string version = "1.2.3";
                 public override void OnInitializeMod()
                 {
-                    if (!string.Equals(Assembly.GetExecutingAssembly().GetName().Name, "ConfigAPI", StringComparison.Ordinal)) {
-                        var curDir = new DirectoryInfo(Assembly.GetExecutingAssembly().Location + "\\..\\..");
+                    var assembly = Assembly.GetExecutingAssembly();
+                    if (!string.Equals(assembly.GetName().Name, "ConfigAPI", StringComparison.Ordinal)) {
+                        var curDir = new DirectoryInfo(assembly.Location + "\\..\\..");
                         Debug.Log($"CustomMapUtility Version \"{version}\" in Local Mode at {curDir.FullName}");
                         _dirInfos = new DirectoryInfo[] { curDir };
                     } else {
@@ -404,7 +405,7 @@ namespace CustomMapUtility {
                     bgmsPath = new DirectoryInfo(Path.Combine(dir.FullName, "Resource/StageBgm"));
                     if (bgmsPath.Exists) {
                         Debug.LogWarning("CustomMapUtility: StageBgm folder is now obselete, please use CustomAudio folder instead.");
-                        Singleton<ModContentManager>.Instance.GetErrorLogs().Add($"<color=yellow>(pid: {Assembly.GetExecutingAssembly().GetName().Name}) CustomMapUtility: StageBgm folder is now obselete, please use CustomAudio folder instead.</color>");
+                        Singleton<ModContentManager>.Instance.GetErrorLogs().Add($"<color=yellow>(assembly: {Assembly.GetExecutingAssembly().GetName().Name}) CustomMapUtility: StageBgm folder is now obselete, please use CustomAudio folder instead.</color>");
                         foreach (FileInfo file in bgmsPath.GetFiles()) {
                             bgms.Add(file);
                         }
@@ -491,7 +492,7 @@ namespace CustomMapUtility {
             AudioClip[] output = new AudioClip[BGMs.Length];
             var handler = new AudioHandler();
             for (int i = 0; i < BGMs.Length; i++) {
-                if (HeldTask.ContainsKey(BGMs[i])) {
+                if (HeldTheme.ContainsKey(BGMs[i])) {
                     if (HeldTheme[BGMs[i]].TryGetTarget(out AudioClip clip)) {
                         output[i] = clip;
                         CurrentCache.Dictionary[BGMs[i]] = clip;
@@ -691,19 +692,22 @@ namespace CustomMapUtility {
         }
         public static AudioClip GetEnemyTheme(string bgmName) => GetAudioClip(bgmName);
         public static AudioClip GetAudioClip(string bgmName) {
+            AudioClip theme;
             if (!HeldTask.ContainsKey(bgmName)) {
-                if (!HeldTheme[bgmName].TryGetTarget(out AudioClip _)) {
+                if (!HeldTheme.ContainsKey(bgmName) || !HeldTheme[bgmName].TryGetTarget(out theme)) {
                     Debug.LogWarning("CustomMapUtility:AudioHandler: Theme was not already loaded, preload the theme with LoadEnemyTheme(bgmName) if possible");
-                    LoadEnemyTheme(bgmName);
+                    LoadEnemyTheme(bgmName, out theme);
+                    return theme;
                 }
-                Debug.LogWarning("CustomMapUtility:AudioHandler: Entry does not exist in held themes but existed in cache");
+                Debug.Log("CustomMapUtility:AudioHandler: Entry grabbed from cache");
+                return theme;
             } else {
                 HeldTask.Remove(bgmName, out Task task);
                 task.Wait();
             }
-            if (!HeldTheme[bgmName].TryGetTarget(out AudioClip theme)) {
-                Debug.LogWarning("CustomMapUtility:AudioHandler: Entry was dropped from memory, maybe it was held for too long? Reloading entry");
-                LoadEnemyTheme(bgmName);
+            if (!HeldTheme[bgmName].TryGetTarget(out theme)) {
+                Debug.LogWarning("CustomMapUtility:AudioHandler: Entry was dropped from memory. Reloading entry");
+                LoadEnemyTheme(bgmName, out theme);
             }
             Debug.Log($"CustomMapUtility:AudioHandler:Task: Got EnemyTheme {bgmName}");
             return theme;

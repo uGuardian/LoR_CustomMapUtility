@@ -409,6 +409,7 @@ namespace CustomMapUtility {
 
         public override string ToString()
         {
+            #pragma warning disable MA0011
             return string.Format("[WAV: RIFFtag={4}, NumChannels={0}, FileSize={1}, SampleRate={2}, SampleCount={3}]", new object[]
             {
                 this.NumChannels,
@@ -417,6 +418,7 @@ namespace CustomMapUtility {
                 this.SampleCount,
                 this.AudioFormat,
             });
+            #pragma warning restore MA0011
         }
     }
 }

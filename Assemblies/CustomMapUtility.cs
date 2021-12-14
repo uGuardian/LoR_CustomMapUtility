@@ -438,7 +438,11 @@ namespace CustomMapUtility {
 
         public static class ModResources {
             public class CacheInit : ModInitializer {
-                public const string version = "1.2.4";
+                #if !NOMP3
+                public const string version = "1.2.5";
+                #else
+                public const string version = "1.2.5-NOMP3";
+                #endif
                 public override void OnInitializeMod()
                 {
                     var assembly = Assembly.GetExecutingAssembly();
@@ -471,7 +475,9 @@ namespace CustomMapUtility {
                         bgmsDebug += Environment.NewLine+"}";
                         Debug.Log(bgmsDebug);
                     }
+                    #if !NOMP3
                     Singleton<ModContentManager>.Instance.GetErrorLogs().RemoveAll(x => x.Contains("NAudio"));
+                    #endif
                 }
             }
             public static string GetStagePath(string stageName) {

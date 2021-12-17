@@ -439,9 +439,9 @@ namespace CustomMapUtility {
         public static class ModResources {
             public class CacheInit : ModInitializer {
                 #if !NOMP3
-                public const string version = "1.2.5";
+                public const string version = "1.2.6";
                 #else
-                public const string version = "1.2.5-NOMP3";
+                public const string version = "1.2.6-NOMP3";
                 #endif
                 public override void OnInitializeMod()
                 {
@@ -531,17 +531,13 @@ namespace CustomMapUtility {
                 foreach (DirectoryInfo dir in _dirInfos) {
                     DirectoryInfo bgmsPath = new DirectoryInfo(Path.Combine(dir.FullName, "Resource/CustomAudio"));
                     if (bgmsPath.Exists) {
-                        foreach (FileInfo file in bgmsPath.GetFiles()) {
-                            bgms.Add(file);
-                        }
+                        bgms.AddRange(bgmsPath.GetFiles());
                     }
                     bgmsPath = new DirectoryInfo(Path.Combine(dir.FullName, "Resource/StageBgm"));
                     if (bgmsPath.Exists) {
                         Debug.LogWarning("CustomMapUtility: StageBgm folder is now obsolete, please use CustomAudio folder instead.");
                         Singleton<ModContentManager>.Instance.GetErrorLogs().Add($"<color=yellow>(assembly: {Assembly.GetExecutingAssembly().GetName().Name}) CustomMapUtility: StageBgm folder is now obselete, please use CustomAudio folder instead.</color>");
-                        foreach (FileInfo file in bgmsPath.GetFiles()) {
-                            bgms.Add(file);
-                        }
+                        bgms.AddRange(bgmsPath.GetFiles());
                     }
                 }
                 return bgms;
@@ -864,7 +860,8 @@ namespace CustomMapUtility {
                 Debug.Log("CustomMapUtility:AudioHandler: Entry grabbed from cache");
                 return theme;
             } else {
-                HeldTask.Remove(bgmName, out Task task);
+                var task = HeldTask[bgmName];
+                HeldTask.Remove(bgmName);
                 task.Wait();
             }
             if (!HeldTheme[bgmName].TryGetTarget(out theme)) {

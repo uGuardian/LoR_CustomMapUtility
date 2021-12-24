@@ -441,9 +441,9 @@ namespace CustomMapUtility {
         public static class ModResources {
             public class CacheInit : ModInitializer {
                 #if !NOMP3
-                public const string version = "1.3.0";
+                public const string version = "1.3.1";
                 #else
-                public const string version = "1.3.0-NOMP3";
+                public const string version = "1.3.1-NOMP3";
                 #endif
                 public override void OnInitializeMod()
                 {
@@ -544,12 +544,12 @@ namespace CustomMapUtility {
                 }
                 return bgms;
             }
-            public static FileInfo[] GetStageBgmInfos(string[] bgmNames) {
+            public static Dictionary<string, FileInfo> GetStageBgmInfos(string[] bgmNames) {
                 IEnumerable<FileInfo> bgms =
                     from file in GetStageBgmInfos()
                     where bgmNames.Any(b => string.Equals(b, file.Name, StringComparison.OrdinalIgnoreCase))
                     select file;
-                return bgms.ToArray();
+                return bgms.ToDictionary(b => b.Name, StringComparer.OrdinalIgnoreCase);
             }
             /// <summary>
             /// A debug function that resets the stage bgm path cache
@@ -616,31 +616,43 @@ namespace CustomMapUtility {
             UnityEngine.Object.Destroy(original);
             return newManager;
         }
-        private static AudioClip CustomBgmParse(string BGM) => CustomBgmParse(new string[] { BGM })[0];
-        private static AudioClip[] CustomBgmParse(string[] BGMs) {
+        private static AudioClip CustomBgmParse(string BGM) => CustomBgmParse(new string[] { BGM }, false)[0];
+        private static AudioClip[] CustomBgmParse(string[] BGMs) => CustomBgmParse(BGMs, false);
+        private static AudioClip[] CustomBgmParse(string[] BGMs, bool async) {
             var files = ModResources.GetStageBgmInfos(BGMs);
+            if (files?.Count == 0) {
+                foreach (var bgm in BGMs) {
+                    Debug.LogError($"CustomMapUtility:AudioHandler: {bgm} does not exist.");
+                }
+                return null;
+            }
             if (CurrentCache == null) {
                 CurrentCache = SingletonBehavior<BattleScene>.Instance.gameObject.GetComponent<AudioCache>();
                 if (CurrentCache == null) {
                     CurrentCache = SingletonBehavior<BattleScene>.Instance.gameObject.AddComponent<AudioCache>();
                 }
             }
-            AudioClip[] output = new AudioClip[BGMs.Length];
+            var parsed = new Dictionary<string, AudioClip>(files.Count, StringComparer.OrdinalIgnoreCase);
+            var index = new Dictionary<int, string>(files.Count);
+            for (int i = 0; i < BGMs.Length; i++) {
+                index.Add(i, BGMs[i]);
+            }
             var handler = CurrentCache;
-            for (int i = 0; i < BGMs.Length; i++) {
-                if (HeldTheme.ContainsKey(BGMs[i])) {
-                    if (HeldTheme[BGMs[i]].TryGetTarget(out AudioClip clip) && clip != null) {
-                        output[i] = clip;
-                        CurrentCache.Dictionary[BGMs[i]] = clip;
+            foreach (var file in files) {
+                var name = file.Key;
+                if (HeldTheme.ContainsKey(name)) {
+                    if (HeldTheme[name].TryGetTarget(out AudioClip clip) && clip != null) {
+                        parsed[name] = clip;
+                        CurrentCache.Dictionary[name] = clip;
                         continue;
                     }
-                    HeldTheme.Remove(BGMs[i]);
+                    HeldTheme.Remove(name);
                 }
                 try {
-                    var info = files[i];
+                    var info = files[name];
                     AudioType format = AudioType.UNKNOWN;
-                    // Debug.Log($"CustomMapUtility: Audio{i} = {BGMs[i]}");
-                    Debug.Log($"CustomMapUtility: Loading {BGMs[i]}");
+                    // Debug.Log($"CustomMapUtility:AudioHandler: Audio{i} = {name}");
+                    Debug.Log($"CustomMapUtility:AudioHandler: Loading {name}");
                     switch (info.Extension.ToUpperInvariant()) {
                         case ".WAVE":
                         case ".WAV": {
@@ -708,115 +720,36 @@ namespace CustomMapUtility {
                             break;
                         }
                     }
-                    var clip = handler.Parse(files[i].FullName, format);
-                    if (clip != null) {
-                        clip.name = BGMs[i];
+                    if (!async) {
+                        var clip = handler.Parse(files[name].FullName, format);
+                        if (clip != null) {
+                            clip.name = name;
+                        }
+                        parsed[name] = clip;
+                        CurrentCache.Dictionary[name] = clip;
+                        HeldTheme[name] = new WeakReference<AudioClip>(clip);
+                    } else {
+                        CurrentCache.Async(files[name].FullName, format, name);
                     }
-                    output[i] = clip;
-                    CurrentCache.Dictionary[BGMs[i]] = clip;
-                    HeldTheme[BGMs[i]] = new WeakReference<AudioClip>(clip);
                 } catch (Exception ex) {
                     Debug.LogException(ex);
-                    output[i] = null;
+                    parsed[name] = null;
                 }
             }
-            return output;
-        }
-        private static void CustomBgmParseAsync(string BGM) => CustomBgmParseAsync(new string[] { BGM });
-        private static void CustomBgmParseAsync(string[] BGMs) {
-            var files = ModResources.GetStageBgmInfos(BGMs);
-            if (CurrentCache == null) {
-                CurrentCache = SingletonBehavior<BattleScene>.Instance.gameObject.GetComponent<AudioCache>();
-                if (CurrentCache == null) {
-                    CurrentCache = SingletonBehavior<BattleScene>.Instance.gameObject.AddComponent<AudioCache>();
-                }
-            }
-            for (int i = 0; i < BGMs.Length; i++) {
-                if (HeldTheme.ContainsKey(BGMs[i])) {
-                    if (HeldTheme[BGMs[i]].TryGetTarget(out AudioClip clip) && clip != null) {
-                        CurrentCache.Dictionary[BGMs[i]] = clip;
-                        continue;
+            if (!async) {
+                var output = new AudioClip[BGMs.Length];
+                foreach (var i in index) {
+                    if (!parsed.TryGetValue(i.Value, out output[i.Key])) {
+                        Debug.LogError($"CustomMapUtility:AudioHandler: {i.Value} does not exist.");
                     }
-                    HeldTheme.Remove(BGMs[i]);
                 }
-                try {
-                    var info = files[i];
-                    AudioType format = AudioType.UNKNOWN;
-                    // Debug.Log($"CustomMapUtility: Audio{i} = {BGMs[i]}");
-                    Debug.Log($"CustomMapUtility: Loading {BGMs[i]}");
-                    switch (info.Extension.ToUpperInvariant()) {
-                        case ".WAVE":
-                        case ".WAV": {
-                            format = AudioType.WAV;
-                            break;
-                        }
-                        case ".MP3":
-                        case ".MPEG": {
-                            format = AudioType.MPEG;
-                            break;
-                        }
-                        case ".OGV":
-                        case ".OGA":
-                        case ".OGX":
-                        case ".OGM":
-                        case ".SPX":
-                        case ".OPUS":
-                        case ".OGG": {
-                            format = AudioType.OGGVORBIS;
-                            break;
-                        }
-                        case ".MP4":
-                        case ".3GP":
-                        case ".M4B":
-                        case ".M4P":
-                        case ".M4R":
-                        case ".M4V":
-                        case ".M4A":
-                        case ".AAC": {
-                            format = AudioType.ACC;
-                            break;
-                        }
-                        case ".AIF":
-                        case ".AIFC":
-                        case ".AIFF": {
-                            format = AudioType.AIFF;
-                            break;
-                        }
-                        case ".IT": {
-                            format = AudioType.IT;
-                            break;
-                        }
-                        case ".MOD": {
-                            format = AudioType.MOD;
-                            break;
-                        }
-                        case ".S3M": {
-                            format = AudioType.S3M;
-                            break;
-                        }
-                        case ".XM": {
-                            format = AudioType.XM;
-                            break;
-                        }
-                        case ".XMA": {
-                            format = AudioType.XMA;
-                            break;
-                        }
-                        case ".VAG": {
-                            format = AudioType.VAG;
-                            break;
-                        }
-                        default: {
-                            Debug.LogError("CustomMapUtility:AudioHandler: File type unknown");
-                            break;
-                        }
-                    }
-                    CurrentCache.Async(files[i].FullName, format, BGMs[i]);
-                } catch (Exception ex) {
-                    Debug.LogException(ex);
-                }
+                return output;
+            } else {
+                return null;
             }
         }
+        private static void CustomBgmParseAsync(string BGM) => CustomBgmParse(new string[] { BGM }, true);
+        private static void CustomBgmParseAsync(string[] BGMs) => CustomBgmParse(BGMs, true);
         sealed private class AudioCache : MonoBehaviour {
             #pragma warning disable IDE0051
             public AudioClip Parse(string path, AudioType format) {

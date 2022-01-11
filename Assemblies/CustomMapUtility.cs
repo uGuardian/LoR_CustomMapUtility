@@ -232,7 +232,7 @@ namespace CustomMapUtility {
         }
 
         protected void Init(string stageName, MapManager manager, Offsets offsets, bool isEgo, bool initBGMs) {
-            Debug.LogWarning("CustomMapUtility: StageController.InitializeMap throwing a NullReferenceException on stage start is expected, you can freely ignore it");
+            // Debug.LogWarning("CustomMapUtility: StageController.InitializeMap throwing a NullReferenceException on stage start is expected, you can freely ignore it");
             List<MapManager> addedMapList = SingletonBehavior<BattleSceneRoot>.Instance.GetType().GetField("_addedMapList", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(SingletonBehavior<BattleSceneRoot>.Instance) as List<MapManager>;
             MapManager x2 = addedMapList?.Find((MapManager x) => x.name.Contains(stageName));
             if (x2 != null && x2.Equals(manager.GetType())) {
@@ -437,9 +437,9 @@ namespace CustomMapUtility {
         public static class ModResources {
             public class CacheInit : ModInitializer {
                 #if !NOMP3
-                public const string version = "1.4.0";
+                public const string version = "1.4.1";
                 #else
-                public const string version = "1.4.0-NOMP3";
+                public const string version = "1.4.1-NOMP3";
                 #endif
                 public override void OnInitializeMod()
                 {
@@ -1400,16 +1400,18 @@ namespace CustomMapUtility {
             base.EnableMap(b);
             this.gameObject.SetActive(b);
             SingletonBehavior<BattleCamManager>.Instance.BlurBackgroundCam(!b);
-            if (AutoBGM) {
-                mapBgm = SingletonBehavior<BattleSoundManager>.Instance.GetCurrentTheme(out bool isEnemy);
-                if (!isEnemy) {
-                    Debug.LogWarning("CustomMapUtility: Use of AutoBGM on themes not included in EnemyThemes is not officially supported yet");
-                }
-            } else if (mapBgm == null) {
-                Debug.LogError("CustomMapUtility: mapBgm was null when the map was enabled. Setting it to current theme.");
-                mapBgm = SingletonBehavior<BattleSoundManager>.Instance.GetCurrentTheme(out bool isEnemy);
-                if (!isEnemy) {
-                    Debug.LogWarning("CustomMapUtility: Use of AutoBGM on themes not included in EnemyThemes is not officially supported yet");
+            if (b) {
+                if (AutoBGM) {
+                    mapBgm = SingletonBehavior<BattleSoundManager>.Instance.GetCurrentTheme(out bool isEnemy);
+                    if (!isEnemy) {
+                        Debug.LogWarning("CustomMapUtility: Use of AutoBGM on themes not included in EnemyThemes is not officially supported yet");
+                    }
+                } else if (mapBgm == null) {
+                    Debug.LogError("CustomMapUtility: mapBgm was null when the map was enabled. Setting it to current theme.");
+                    mapBgm = SingletonBehavior<BattleSoundManager>.Instance.GetCurrentTheme(out bool isEnemy);
+                    if (!isEnemy) {
+                        Debug.LogWarning("CustomMapUtility: Use of AutoBGM on themes not included in EnemyThemes is not officially supported yet");
+                    }
                 }
             }
         }
@@ -1450,16 +1452,18 @@ namespace CustomMapUtility {
             base.EnableMap(b);
             this.gameObject.SetActive(b);
             SingletonBehavior<BattleCamManager>.Instance.BlurBackgroundCam(!b);
-            if (AutoBGM) {
-                mapBgm = SingletonBehavior<BattleSoundManager>.Instance.GetCurrentTheme(out bool isEnemy);
-                if (!isEnemy) {
-                    Debug.LogWarning("CustomMapUtility: Use of AutoBGM on themes not included in EnemyThemes is not officially supported yet");
-                }
-            } else if (mapBgm == null) {
-                Debug.LogError("CustomMapUtility: mapBgm was null when the map was enabled. Setting it to current theme.");
-                mapBgm = SingletonBehavior<BattleSoundManager>.Instance.GetCurrentTheme(out bool isEnemy);
-                if (!isEnemy) {
-                    Debug.LogWarning("CustomMapUtility: Use of AutoBGM on themes not included in EnemyThemes is not officially supported yet");
+            if (b) {
+                if (AutoBGM) {
+                    mapBgm = SingletonBehavior<BattleSoundManager>.Instance.GetCurrentTheme(out bool isEnemy);
+                    if (!isEnemy) {
+                        Debug.LogWarning("CustomMapUtility: Use of AutoBGM on themes not included in EnemyThemes is not officially supported yet");
+                    }
+                } else if (mapBgm == null) {
+                    Debug.LogError("CustomMapUtility: mapBgm was null when the map was enabled. Setting it to current theme.");
+                    mapBgm = SingletonBehavior<BattleSoundManager>.Instance.GetCurrentTheme(out bool isEnemy);
+                    if (!isEnemy) {
+                        Debug.LogWarning("CustomMapUtility: Use of AutoBGM on themes not included in EnemyThemes is not officially supported yet");
+                    }
                 }
             }
         }

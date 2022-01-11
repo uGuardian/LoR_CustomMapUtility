@@ -269,28 +269,24 @@ namespace CustomMapUtility {
             SetScratches(stageName, manager);
             if (initBGMs) {
                 try {
-                    var managerTemp = manager as CustomMapManager;
-                    if (managerTemp.CustomBGMs != null) {
-                        manager.mapBgm = CustomBgmParse(managerTemp.CustomBGMs);
+                    var managerTemp = manager as IBGM;
+                    var bgms = managerTemp.GetCustomBGMs();
+                    if (bgms != null && bgms.Length != 0) {
+                        manager.mapBgm = CustomBgmParse(bgms);
                     } else {
                         // If you get this error and your method stops, you've called SingletonBehavior<BattleSoundManager>.Instance.OnStageStart(), don't do that. 
-                        Debug.LogError("CustomMapUtility: CustomBGMs is null or empty, filling with current themes");
+                        Debug.Log("CustomMapUtility: CustomBGMs is null or empty, enabling AutoBGM");
+                        managerTemp.AutoBGM = true;
                     }
-                } catch (NullReferenceException) {
-                    try {
-                        var managerTemp = manager as CustomCreatureMapManager;
-                        if (managerTemp.CustomBGMs != null && managerTemp.CustomBGMs.Length != 0) {
-                            manager.mapBgm = CustomBgmParse(managerTemp.CustomBGMs);
-                        } else {
-                            // If you get this error and your method stops, you've called SingletonBehavior<BattleSoundManager>.Instance.OnStageStart(), don't do that. 
-                            Debug.LogError("CustomMapUtility: CustomBGMs is null or empty, filling with current themes");
-                        }
-                    } catch (NullReferenceException ex) {
-                        Debug.LogError($"CustomMapUtility: MapManager is not inherited from Custom(Creature)MapManager{Environment.NewLine}{ex}{Environment.NewLine}");
-                    }
+                } catch (NullReferenceException ex) {
+                    Debug.LogError("CustomMapUtility: MapManager is not inherited from Custom(Creature)MapManager");
+                    Debug.LogException(ex);
+                } catch (Exception ex) {
+                    Debug.LogError("CustomMapUtility: Failed to get BGMs");
+                    Debug.LogException(ex);
                 }
             } else {
-                Debug.LogWarning("CustomMapUtility: Auto BGM initialization is off");
+                Debug.LogWarning("CustomMapUtility: BGM initialization is disabled");
             }
             if (!isEgo) {
                 SingletonBehavior<BattleSceneRoot>.Instance.InitInvitationMap(manager);
@@ -441,9 +437,9 @@ namespace CustomMapUtility {
         public static class ModResources {
             public class CacheInit : ModInitializer {
                 #if !NOMP3
-                public const string version = "1.3.1";
+                public const string version = "1.4.0";
                 #else
-                public const string version = "1.3.1-NOMP3";
+                public const string version = "1.4.0-NOMP3";
                 #endif
                 public override void OnInitializeMod()
                 {
@@ -1368,13 +1364,54 @@ namespace CustomMapUtility {
             bool isEgo = false, bool initBGMs = true) {
                 CustomMapHandler.InitCustomMap(stageName, manager, offsets, isEgo, initBGMs);
         }
+        /// <summary>
+        /// Gets the current playing theme.
+        /// </summary>
+        public static AudioClip[] GetCurrentTheme(this BattleSoundManager Instance) => GetCurrentTheme(Instance, out _);
+        /// <summary>
+        /// Gets the current playing theme and outputs whether it's an EnemyTheme.
+        /// </summary>
+        public static AudioClip[] GetCurrentTheme(this BattleSoundManager Instance, out bool isEnemy) {
+            var enemyThemes = GetEnemyTheme(Instance);
+            if (enemyThemes.Contains(Instance.CurrentPlayingTheme.clip)) {
+                isEnemy = true;
+                return enemyThemes;
+            }
+            Debug.LogWarning("Current theme is not in EnemyThemes, returning only the currently playing theme");
+            isEnemy = false;
+            return new AudioClip[]{Instance.CurrentPlayingTheme.clip};
+        }
+        /// <summary>
+        /// Gets the current enemy theme.
+        /// </summary>
+        public static AudioClip[] GetEnemyTheme(this BattleSoundManager Instance) {
+            var enemyThemes = Instance.SetEnemyTheme(new AudioClip[]{null});
+            Instance.SetEnemyTheme(enemyThemes);
+            return enemyThemes;
+        }
+    }
+    interface IBGM {
+        string[] GetCustomBGMs();
+        bool AutoBGM {get; set;}
     }
 
-    public class CustomMapManager : MapManager {
+    public class CustomMapManager : MapManager, IBGM {
         public override void EnableMap(bool b) {
             base.EnableMap(b);
             this.gameObject.SetActive(b);
             SingletonBehavior<BattleCamManager>.Instance.BlurBackgroundCam(!b);
+            if (AutoBGM) {
+                mapBgm = SingletonBehavior<BattleSoundManager>.Instance.GetCurrentTheme(out bool isEnemy);
+                if (!isEnemy) {
+                    Debug.LogWarning("CustomMapUtility: Use of AutoBGM on themes not included in EnemyThemes is not officially supported yet");
+                }
+            } else if (mapBgm == null) {
+                Debug.LogError("CustomMapUtility: mapBgm was null when the map was enabled. Setting it to current theme.");
+                mapBgm = SingletonBehavior<BattleSoundManager>.Instance.GetCurrentTheme(out bool isEnemy);
+                if (!isEnemy) {
+                    Debug.LogWarning("CustomMapUtility: Use of AutoBGM on themes not included in EnemyThemes is not officially supported yet");
+                }
+            }
         }
         public override GameObject GetScratch(int lv, Transform parent)
         {
@@ -1399,17 +1436,32 @@ namespace CustomMapUtility {
             sephirahType = SephirahType.None;
             sephirahColor = Color.black;
         }
+        string[] IBGM.GetCustomBGMs() => CustomBGMs;
         /// <summary>
         /// Override and specify a string array with audio file names (including extensions) for the get parameter.
         /// If you put multiple strings in it'll change between them based on emotion level. (Emotion level 0, 2, and 4 respectively).
         /// </summary>
         protected internal virtual string[] CustomBGMs {get;}
+        bool IBGM.AutoBGM {get => AutoBGM; set => AutoBGM = value;}
+        bool AutoBGM = false;
     }
-    public class CustomCreatureMapManager : CreatureMapManager {
+    public class CustomCreatureMapManager : CreatureMapManager, IBGM {
         public override void EnableMap(bool b) {
             base.EnableMap(b);
             this.gameObject.SetActive(b);
             SingletonBehavior<BattleCamManager>.Instance.BlurBackgroundCam(!b);
+            if (AutoBGM) {
+                mapBgm = SingletonBehavior<BattleSoundManager>.Instance.GetCurrentTheme(out bool isEnemy);
+                if (!isEnemy) {
+                    Debug.LogWarning("CustomMapUtility: Use of AutoBGM on themes not included in EnemyThemes is not officially supported yet");
+                }
+            } else if (mapBgm == null) {
+                Debug.LogError("CustomMapUtility: mapBgm was null when the map was enabled. Setting it to current theme.");
+                mapBgm = SingletonBehavior<BattleSoundManager>.Instance.GetCurrentTheme(out bool isEnemy);
+                if (!isEnemy) {
+                    Debug.LogWarning("CustomMapUtility: Use of AutoBGM on themes not included in EnemyThemes is not officially supported yet");
+                }
+            }
         }
         public override GameObject GetScratch(int lv, Transform parent)
         {
@@ -1434,10 +1486,13 @@ namespace CustomMapUtility {
             sephirahType = SephirahType.None;
             sephirahColor = Color.black;
         }
+        string[] IBGM.GetCustomBGMs() => CustomBGMs;
         /// <summary>
         /// Override and specify a string array with audio file names (including extensions) for the get parameter.
         /// If you put multiple strings in it'll change between them based on emotion level. (Emotion level 0, 2, and 4 respectively).
         /// </summary>
         protected internal virtual string[] CustomBGMs {get;}
+        bool IBGM.AutoBGM {get => AutoBGM; set => AutoBGM = value;}
+        bool AutoBGM = false;
     }
 }

@@ -437,9 +437,9 @@ namespace CustomMapUtility {
         public static class ModResources {
             public class CacheInit : ModInitializer {
                 #if !NOMP3
-                public const string version = "1.4.1";
+                public const string version = "1.4.2";
                 #else
-                public const string version = "1.4.1-NOMP3";
+                public const string version = "1.4.2-NOMP3";
                 #endif
                 public override void OnInitializeMod()
                 {
@@ -1445,7 +1445,7 @@ namespace CustomMapUtility {
         /// </summary>
         protected internal virtual string[] CustomBGMs {get;}
         bool IBGM.AutoBGM {get => AutoBGM; set => AutoBGM = value;}
-        bool AutoBGM = false;
+        protected internal bool AutoBGM = false;
     }
     public class CustomCreatureMapManager : CreatureMapManager, IBGM {
         public override void EnableMap(bool b) {
@@ -1497,6 +1497,6 @@ namespace CustomMapUtility {
         /// </summary>
         protected internal virtual string[] CustomBGMs {get;}
         bool IBGM.AutoBGM {get => AutoBGM; set => AutoBGM = value;}
-        bool AutoBGM = false;
+        protected internal bool AutoBGM = false;
     }
 }

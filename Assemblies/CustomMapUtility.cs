@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -437,9 +438,9 @@ namespace CustomMapUtility {
         public static class ModResources {
             public class CacheInit : ModInitializer {
                 #if !NOMP3
-                public const string version = "1.4.2";
+                public const string version = "1.5.0";
                 #else
-                public const string version = "1.4.2-NOMP3";
+                public const string version = "1.5.0-NOMP3";
                 #endif
                 public override void OnInitializeMod()
                 {
@@ -797,8 +798,13 @@ namespace CustomMapUtility {
                 // }
                 using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip($"file://{path}", format))
                 {
-                    var request = www.SendWebRequest();
-                    CurrentCache.wwwDic.TryAdd(bgmName, (request, (path, format)));
+                    UnityWebRequestAsyncOperation request;
+                    if (!CurrentCache.wwwDic.ContainsKey(bgmName)) {
+                        request = www.SendWebRequest();
+                        CurrentCache.wwwDic.TryAdd(bgmName, (request, (path, format)));
+                    } else {
+                        yield break;
+                    }
                     yield return request;
 
                     if (www.isNetworkError)
@@ -869,7 +875,7 @@ namespace CustomMapUtility {
                             HeldTheme[bgmName] = new WeakReference<AudioClip>(clip);
                             StopCoroutine(coroutines[bgmName]);
                             coroutines.Remove(bgmName);
-                            wwwDic.Remove(bgmName);
+                            wwwDic.TryRemove(bgmName, out _);
                             return clip;
                         } catch {
                             HeldTheme[bgmName] = new WeakReference<AudioClip>(null);
@@ -894,9 +900,9 @@ namespace CustomMapUtility {
                 coroutines.Clear();
                 wwwDic.Clear();
             }
-            public readonly Dictionary<string, AudioClip> Dictionary = new Dictionary<string, AudioClip>(StringComparer.Ordinal);
+            public readonly ConcurrentDictionary<string, AudioClip> Dictionary = new ConcurrentDictionary<string, AudioClip>(StringComparer.Ordinal);
             readonly Dictionary<string, Coroutine> coroutines = new Dictionary<string, Coroutine>(StringComparer.Ordinal);
-            internal readonly Dictionary<string, (UnityWebRequestAsyncOperation, (string, AudioType))> wwwDic = new Dictionary<string, (UnityWebRequestAsyncOperation, (string, AudioType))>(StringComparer.Ordinal);
+            internal readonly ConcurrentDictionary<string, (UnityWebRequestAsyncOperation, (string, AudioType))> wwwDic = new ConcurrentDictionary<string, (UnityWebRequestAsyncOperation, (string, AudioType))>(StringComparer.Ordinal);
             #pragma warning restore IDE0051
         }
         // Legacy cache implementation that's a pain to change and acts as a near-zero overhead redundancy.

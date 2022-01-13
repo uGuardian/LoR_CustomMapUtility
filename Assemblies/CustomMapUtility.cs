@@ -324,8 +324,8 @@ namespace CustomMapUtility {
             }
         }
 
-        private static readonly ConcurrentDictionary<string, Offsets> mapOffsetsCache = new ConcurrentDictionary<string, Offsets>(StringComparer.Ordinal);
-        private static readonly ConcurrentDictionary<string, bool> mapAutoBgmCache = new ConcurrentDictionary<string, bool>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, Offsets> mapOffsetsCache = new Dictionary<string, Offsets>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, bool> mapAutoBgmCache = new Dictionary<string, bool>(StringComparer.Ordinal);
 
         private void SetTextures(MapManager manager, Offsets offsets) {
             foreach (var component in manager.GetComponentsInChildren<Component>()) {
@@ -461,9 +461,9 @@ namespace CustomMapUtility {
         public static class ModResources {
             public class CacheInit : ModInitializer {
                 #if !NOMP3
-                public const string version = "2.0.0";
+                public const string version = "2.0.1";
                 #else
-                public const string version = "2.0.0-NOMP3";
+                public const string version = "2.0.1-NOMP3";
                 #endif
                 public override void OnInitializeMod()
                 {

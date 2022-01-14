@@ -461,9 +461,9 @@ namespace CustomMapUtility {
         public static class ModResources {
             public class CacheInit : ModInitializer {
                 #if !NOMP3
-                public const string version = "2.0.1";
+                public const string version = "2.0.2";
                 #else
-                public const string version = "2.0.1-NOMP3";
+                public const string version = "2.0.2-NOMP3";
                 #endif
                 public override void OnInitializeMod()
                 {
@@ -612,30 +612,18 @@ namespace CustomMapUtility {
             newManager.scratchPrefabs = original.scratchPrefabs;
             newManager.wallCratersPrefabs = original.wallCratersPrefabs;
 
-            #if RootCopy //TODO Fix and implement rootcopy mode
-            var originalTypeBase = original.GetType().BaseType;
-            var newManagerType = managerType;
-            FieldInfo rootField = null;
-            FieldInfo obstacleRootField = null;
-            while (rootField == null || obstacleRootField == null) {
-                newManagerType = newManagerType.BaseType;
-                if (newManagerType == null) {
-                    Debug.LogWarning("CustomMapUtility: InitManager had a minor error", newManager);
-                    goto ManagerReturn;
-                }
-                try {
-                    rootField = newManagerType.GetField("_root", BindingFlags.NonPublic | BindingFlags.Instance);
-                    obstacleRootField = newManagerType.GetField("_obstacleRoot", BindingFlags.NonPublic | BindingFlags.Instance);
-                } catch {}
+            try {
+            rootField.SetValue(newManager, rootField.GetValue(original));
+            // obstacleRootField.SetValue(newManager, obstacleRootField.GetValue(original));
+            } catch {
+                Debug.LogWarning("CustomMapUtility: InitManager had a minor error", newManager);
             }
-            rootField.SetValue(newManager, originalTypeBase.GetField("_root", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(original));
-            obstacleRootField.SetValue(newManager, originalTypeBase.GetField("_obstacleRoot", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(original));
-            ManagerReturn:
-            #endif
 
             UnityEngine.Object.Destroy(original);
             return newManager;
         }
+        private static readonly FieldInfo rootField = typeof(MapManager).GetField("_roots", BindingFlags.NonPublic | BindingFlags.Instance);
+        // private static readonly FieldInfo obstacleRootField = typeof(MapManager).GetField("_obstacleRoot", BindingFlags.NonPublic | BindingFlags.Instance);
         private static AudioClip CustomBgmParse(string BGM) => CustomBgmParse(new string[] { BGM }, false)[0];
         private static AudioClip[] CustomBgmParse(string[] BGMs) => CustomBgmParse(BGMs, false);
         private static AudioClip[] CustomBgmParse(string[] BGMs, bool async) {
@@ -1504,7 +1492,6 @@ namespace CustomMapUtility {
     public class CustomMapManager : MapManager, IBGM {
         public override void EnableMap(bool b) {
             base.EnableMap(b);
-            this.gameObject.SetActive(b);
             SingletonBehavior<BattleCamManager>.Instance.BlurBackgroundCam(!b);
             if (b) {
                 if (AutoBGM) {
@@ -1561,7 +1548,6 @@ namespace CustomMapUtility {
     public class CustomCreatureMapManager : CreatureMapManager, IBGM {
         public override void EnableMap(bool b) {
             base.EnableMap(b);
-            this.gameObject.SetActive(b);
             SingletonBehavior<BattleCamManager>.Instance.BlurBackgroundCam(!b);
             if (b) {
                 if (AutoBGM) {

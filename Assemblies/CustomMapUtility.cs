@@ -612,20 +612,20 @@ namespace CustomMapUtility {
             newManager.scratchPrefabs = original.scratchPrefabs;
             newManager.wallCratersPrefabs = original.wallCratersPrefabs;
 
-            #if RootCopy
+            #if RootCopy //TODO Fix and implement rootcopy mode
             var originalTypeBase = original.GetType().BaseType;
-            var newManagerTypeBase = newManager.GetType();
+            var newManagerType = managerType;
             FieldInfo rootField = null;
             FieldInfo obstacleRootField = null;
             while (rootField == null || obstacleRootField == null) {
-                newManagerTypeBase = newManagerTypeBase.BaseType;
-                if (newManagerTypeBase == null) {
+                newManagerType = newManagerType.BaseType;
+                if (newManagerType == null) {
                     Debug.LogWarning("CustomMapUtility: InitManager had a minor error", newManager);
                     goto ManagerReturn;
                 }
                 try {
-                    rootField = newManagerTypeBase.GetField("_root", BindingFlags.NonPublic | BindingFlags.Instance);
-                    rootField = newManagerTypeBase.GetField("_obstacleRoot", BindingFlags.NonPublic | BindingFlags.Instance);
+                    rootField = newManagerType.GetField("_root", BindingFlags.NonPublic | BindingFlags.Instance);
+                    obstacleRootField = newManagerType.GetField("_obstacleRoot", BindingFlags.NonPublic | BindingFlags.Instance);
                 } catch {}
             }
             rootField.SetValue(newManager, originalTypeBase.GetField("_root", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(original));

@@ -266,8 +266,19 @@ namespace CustomMapUtility {
             }
 
             GameObject mapObject = Util.LoadPrefab("InvitationMaps/InvitationMap_Philip1", SingletonBehavior<BattleSceneRoot>.Instance.transform);
+
+            #region InheritanceDebug
+            Type managerTypeInherit = managerType;
+            string managerTypeName = managerTypeInherit.Name;
+            while (managerTypeInherit != typeof(MapManager)) {
+                managerTypeInherit = managerTypeInherit.BaseType;
+                managerTypeName = $"{managerTypeInherit.Name}:{managerTypeName}";
+            }
+            Debug.Log($"CustomMapUtility: Initializing {stageName} with {managerTypeName}");
+            #endregion
+            
             mapObject.name = "InvitationMap_"+stageName;
-            var manager = this.InitManager(managerType, mapObject);
+            var manager = InitManager(managerType, mapObject);
 
             var currentStagePath = ModResources.GetStagePath(stageName);
             newAssets = new ListDictionary(StringComparer.Ordinal){
@@ -291,26 +302,26 @@ namespace CustomMapUtility {
             Debug.Log(log);
             SetTextures(manager, offsets);
             SetScratches(stageName, manager);
+            // Don't ever call SingletonBehavior<BattleSoundManager>.Instance.OnStageStart()
             if (initBGMs) {
                 try {
-                    var managerTemp = manager as IBGM;
-                    var bgms = managerTemp.GetCustomBGMs();
-                    if (bgms != null && bgms.Length != 0) {
-                        manager.mapBgm = CustomBgmParse(bgms);
+                    if (manager is IBGM managerTemp) {
+                        var bgms = managerTemp.GetCustomBGMs();
+                        if (bgms != null && bgms.Length != 0) {
+                            manager.mapBgm = CustomBgmParse(bgms);
+                        } else {
+                            Debug.Log("CustomMapUtility: CustomBGMs is null or empty, enabling AutoBGM");
+                            managerTemp.AutoBGM = true;
+                        }
                     } else {
-                        // If you get this error and your method stops, you've called SingletonBehavior<BattleSoundManager>.Instance.OnStageStart(), don't do that. 
-                        Debug.Log("CustomMapUtility: CustomBGMs is null or empty, enabling AutoBGM");
-                        managerTemp.AutoBGM = true;
+                        Debug.LogError("CustomMapUtility: MapManager is not inherited from Custom(Creature)MapManager");
                     }
-                } catch (NullReferenceException ex) {
-                    Debug.LogError("CustomMapUtility: MapManager is not inherited from Custom(Creature)MapManager");
-                    Debug.LogException(ex);
                 } catch (Exception ex) {
                     Debug.LogError("CustomMapUtility: Failed to get BGMs");
                     Debug.LogException(ex);
                 }
             } else {
-                Debug.Log($"CustomMapUtility: BGM initialization for {stageName} is disabled");
+                Debug.Log($"CustomMapUtility: BGM initialization is disabled");
             }
             if (!isEgo) {
                 SingletonBehavior<BattleSceneRoot>.Instance.InitInvitationMap(manager);
@@ -333,22 +344,30 @@ namespace CustomMapUtility {
                     case SpriteRenderer renderer when string.Equals(renderer.name, "BG", StringComparison.Ordinal):
                     {
                         Texture2D texture = (Texture2D)newAssets["newBG"];
-                        float pixelsPerUnit = (100f/1920f*(float)texture.width);
-                        renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), offsets.BGOffset, pixelsPerUnit);
+                        if (texture != null) {
+                            float pixelsPerUnit = 100f/1920f*texture.width;
+                            renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), offsets.BGOffset, pixelsPerUnit);
+                        } else {
+                            renderer.gameObject.SetActive(false);
+                        }
                         break;
                     }
                     case SpriteRenderer renderer when renderer.name.Contains("Floor"):
                     {
                         Texture2D texture = (Texture2D)newAssets["newFloor"];
-                        float pixelsPerUnit = (100f/1920f*(float)texture.width);
-                        renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), offsets.FloorOffset, pixelsPerUnit);
+                        if (texture != null) {
+                            float pixelsPerUnit = 100f/1920f*texture.width;
+                            renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), offsets.FloorOffset, pixelsPerUnit);
+                        } else {
+                            renderer.gameObject.SetActive(false);
+                        }
                         break;
                     }
                     case SpriteRenderer renderer when renderer.name.Contains("Under"):
                     {
                         Texture2D texture = (Texture2D)newAssets["newUnder"];
-                        if (texture != null){
-                            float pixelsPerUnit = (100f/1920f*(float)texture.width);
+                        if (texture != null) {
+                            float pixelsPerUnit = 100f/1920f*texture.width;
                             renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), offsets.UnderOffset, pixelsPerUnit);
                         } else {
                             renderer.gameObject.SetActive(false);
@@ -368,11 +387,18 @@ namespace CustomMapUtility {
         private Texture2D ImageLoad(string name, string currentStagePath) {
             Texture2D texture = new Texture2D(2, 2);
             try {
-                texture.LoadImage(File.ReadAllBytes(currentStagePath+"/"+name+".png"));
+                var path = $"{currentStagePath}/{name}";
+                var pngPath = $"{path}.png";
+                var jpgPath = $"{path}.png";
+                if (File.Exists(pngPath)) {
+                    texture.LoadImage(File.ReadAllBytes(pngPath));
+                } else if (File.Exists(jpgPath)) {
+                    texture.LoadImage(File.ReadAllBytes(jpgPath));
+                } else {
+                    return null;
+                }
             } catch {
-                try {
-                    texture.LoadImage(File.ReadAllBytes(currentStagePath+"/"+name+".jpg"));
-                } catch {return null;}
+                return null;
             }
             return texture;
         }
@@ -461,9 +487,9 @@ namespace CustomMapUtility {
         public static class ModResources {
             public class CacheInit : ModInitializer {
                 #if !NOMP3
-                public const string version = "2.0.2";
+                public const string version = "2.1.1";
                 #else
-                public const string version = "2.0.2-NOMP3";
+                public const string version = "2.1.1-NOMP3";
                 #endif
                 public override void OnInitializeMod()
                 {
@@ -518,7 +544,7 @@ namespace CustomMapUtility {
                 if (path == null) {
                     throw new ArgumentNullException(nameof(stageName), "Stage does not exist");
                 }
-                Debug.Log("CustomMapUtility: Loading stage from "+path);
+                Debug.Log("CustomMapUtility: StagePath: "+path);
                 return path;
             }
             [Obsolete("Use GetStageBgmInfos() instead")]
@@ -1515,7 +1541,7 @@ namespace CustomMapUtility {
         }
         public override GameObject GetScratch(int lv, Transform parent)
         {
-            if (this.scratchPrefabs.Length == 0 || this.scratchPrefabs[lv] == null) {
+            if (scratchPrefabs.Length == 0 || scratchPrefabs[lv] == null) {
                 return null;
             }
             return base.GetScratch(lv, parent);
@@ -1571,7 +1597,7 @@ namespace CustomMapUtility {
         }
         public override GameObject GetScratch(int lv, Transform parent)
         {
-            if (this.scratchPrefabs.Length == 0 || this.scratchPrefabs[lv] == null) {
+            if (scratchPrefabs.Length == 0 || scratchPrefabs[lv] == null) {
                 return null;
             }
             return base.GetScratch(lv, parent);

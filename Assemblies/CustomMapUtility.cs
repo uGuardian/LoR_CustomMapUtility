@@ -1156,7 +1156,7 @@ namespace CustomMapUtility {
         public static AudioClip StartEnemyTheme_LoopPair(string clip, string loopClip, float overlap, bool changeoverRaw = true, float changeover = 5) => StartEnemyTheme_LoopPair(GetAudioClip(clip), GetAudioClip(loopClip), overlap, changeoverRaw, changeover);
         public static AudioClip ClipCut(AudioClip clip, int looplength, int loopstart, string name) {
             var newClip = AudioClip.Create(name, looplength, clip.channels, clip.frequency, false);
-            float[] data = new float[looplength*2];
+            float[] data = new float[looplength * clip.channels];
             clip.GetData(data, loopstart);
             newClip.SetData(data, 0);
             return newClip;

@@ -487,9 +487,9 @@ namespace CustomMapUtility {
         public static class ModResources {
             public class CacheInit : ModInitializer {
                 #if !NOMP3
-                public const string version = "2.2.2";
+                public const string version = "2.2.3";
                 #else
-                public const string version = "2.2.2-NOMP3";
+                public const string version = "2.2.3-NOMP3";
                 #endif
                 public override void OnInitializeMod()
                 {
@@ -1144,7 +1144,7 @@ namespace CustomMapUtility {
                     CurrentCache = SingletonBehavior<BattleScene>.Instance.gameObject.AddComponent<AudioCache>();
                 }
             }
-            if ((CurrentCache.LoopSource?.isPlaying ?? false && SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme.clip == clip) || SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme.clip == loopClip) {
+            if (((CurrentCache.LoopSource?.isPlaying ?? false) && SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme.clip == clip) || SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme.clip == loopClip) {
                 return SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme.clip;
             }
             CurrentCache.PlayLoopPair(clip, loopClip, overlap, changeoverRaw, changeover);

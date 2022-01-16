@@ -389,11 +389,14 @@ namespace CustomMapUtility {
             try {
                 var path = $"{currentStagePath}/{name}";
                 var pngPath = $"{path}.png";
-                var jpgPath = $"{path}.png";
+                var jpgPath = $"{path}.jpg";
+                var jpegPath = $"{path}.jpeg";
                 if (File.Exists(pngPath)) {
                     texture.LoadImage(File.ReadAllBytes(pngPath));
                 } else if (File.Exists(jpgPath)) {
                     texture.LoadImage(File.ReadAllBytes(jpgPath));
+                } else if (File.Exists(jpegPath)) {
+                    texture.LoadImage(File.ReadAllBytes(jpegPath));
                 } else {
                     return null;
                 }
@@ -487,9 +490,9 @@ namespace CustomMapUtility {
         public static class ModResources {
             public class CacheInit : ModInitializer {
                 #if !NOMP3
-                public const string version = "2.2.3";
+                public const string version = "2.2.4";
                 #else
-                public const string version = "2.2.3-NOMP3";
+                public const string version = "2.2.4-NOMP3";
                 #endif
                 public override void OnInitializeMod()
                 {

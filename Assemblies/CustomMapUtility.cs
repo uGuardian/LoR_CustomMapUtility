@@ -487,9 +487,9 @@ namespace CustomMapUtility {
         public static class ModResources {
             public class CacheInit : ModInitializer {
                 #if !NOMP3
-                public const string version = "2.1.1";
+                public const string version = "2.2.2";
                 #else
-                public const string version = "2.1.1-NOMP3";
+                public const string version = "2.2.2-NOMP3";
                 #endif
                 public override void OnInitializeMod()
                 {
@@ -791,8 +791,9 @@ namespace CustomMapUtility {
         }
         private static void CustomBgmParseAsync(string BGM) => CustomBgmParse(new string[] { BGM }, true);
         private static void CustomBgmParseAsync(string[] BGMs) => CustomBgmParse(BGMs, true);
-        sealed private class AudioCache : MonoBehaviour {
+        sealed internal class AudioCache : MonoBehaviour {
             #pragma warning disable IDE0051
+            #region AudioParsing
             public AudioClip Parse(string path, AudioType format) {
                 // if (format == AudioType.WAV) {
                 //     return ParseWAV(path);
@@ -903,6 +904,7 @@ namespace CustomMapUtility {
                     coroutines.Add(bgmName, StartCoroutine(ParseAsync(path, format, bgmName)));
                 }
             }
+            #endregion
             public AudioClip CheckAsync(string bgmName, bool errors = true)
             {
                 if (coroutines.ContainsKey(bgmName)) {
@@ -946,6 +948,7 @@ namespace CustomMapUtility {
             void OnDisable() {
                 Dictionary.Clear();
                 StopAllCoroutines();
+                DisableLoopSource();
                 coroutines.Clear();
                 wwwDic.Clear();
             }
@@ -953,11 +956,106 @@ namespace CustomMapUtility {
             readonly Dictionary<string, Coroutine> coroutines = new Dictionary<string, Coroutine>(StringComparer.Ordinal);
             internal readonly ConcurrentDictionary<string, (UnityWebRequestAsyncOperation, (string, AudioType))> wwwDic = new ConcurrentDictionary<string, (UnityWebRequestAsyncOperation, (string, AudioType))>(StringComparer.Ordinal);
             // private Dictionary<string, WeakReference<AudioClip>> HeldTheme {get => CustomMapHandler.HeldTheme;}
+
+            #region LoopAudio
+            //TODO Add audio queue
+            //TODO Allow ally themes
+            public void PlayLoopPair(AudioClip clip, AudioClip loopClip, float overlap = 0, bool changeoverRaw = true, float changeover = 2) {
+                float changeoverlap = changeoverRaw ? overlap - changeover : overlap * changeover;
+                SingletonBehavior<BattleSoundManager>.Instance.ChangeCurrentTheme(false);
+                var currentPlayingTheme = SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme;
+                currentPlayingTheme.Stop();
+                if (loopSource == null) {
+                    loopSource = Instantiate(currentPlayingTheme, currentPlayingTheme.transform.parent);
+                    loopSource.name = "LoopSource";
+                } else {
+                    DisableLoopSource();
+                    if (currentLoop != null) {
+                        StopCoroutine(currentLoop);
+                    }
+                    if (currentCheck != null) {
+                        StopCoroutine(currentCheck);
+                    }
+                }
+                currentPlayingTheme.clip = clip;
+                loopSource.clip = loopClip;
+                float delay = clip.length - (overlap - changeoverlap);
+                double dspDelay = AudioSettings.dspTime+0.2;
+                currentPlayingTheme.PlayScheduled(dspDelay);
+                currentPlayingTheme.time = 0;
+                double switchOver = dspDelay+delay;
+                currentPlayingTheme.SetScheduledEndTime(switchOver);
+                loopSource.PlayScheduled(switchOver);
+                loopSource.time = changeoverlap;
+                SingletonBehavior<BattleSoundManager>.Instance.SetEnemyTheme(new AudioClip[]{clip});
+                float remainTime = loopClip.length - changeoverlap;
+                float flipStart = (float)(switchOver + remainTime + flipStartDelay);
+                currentCheck = StartCoroutine(ChangeCheck(clip, loopClip));
+                currentLoop = StartCoroutine(LoopCheck(loopClip, delay, flipStart));
+                if (overlap != 0 && (changeoverlap < flipStartDelay)) {
+                    Debug.LogWarning("CustomMapUtility:AudioHandler:LoopClip: Changeover value is probably too high");
+                }
+                /*
+                Debug.LogWarning($"clip.length: {clip.length}");
+                Debug.LogWarning($"loopClip.length: {loopClip.length}");
+                Debug.LogWarning($"overlap: {overlap}");
+                Debug.LogWarning($"changeover: {changeover}");
+                Debug.LogWarning($"changeoverlap: {changeoverlap}");
+                Debug.LogWarning($"delay: {delay}");
+                Debug.LogWarning($"dspDelay: {dspDelay}");
+                Debug.LogWarning($"switchOver: {switchOver}");
+                Debug.LogWarning($"remainTime: {remainTime}");
+                Debug.LogWarning($"flipStart: {flipStart}");
+                */
+            }
+
+            public IEnumerator ChangeCheck(AudioClip clip, AudioClip loopClip) {
+                yield return new WaitWhile(() => SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme.clip == clip || SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme.clip == loopClip);
+                DisableLoopSource();
+                StopCoroutine(currentLoop);
+            }
+            public IEnumerator LoopCheck(AudioClip loopClip, float delay, double flipStart) {
+                var currentPlayingTheme = SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme;
+                if (delay > 0) {
+                    yield return new WaitWhile(() => currentPlayingTheme.isPlaying);
+                }
+                while (AudioSettings.dspTime > flipStart) {
+                    flipStart += loopClip.length;
+                }
+                currentPlayingTheme.clip = loopClip;
+                SingletonBehavior<BattleSoundManager>.Instance.SetEnemyTheme(new AudioClip[]{loopClip});
+                currentPlayingTheme.PlayScheduled(flipStart);
+                loopSource.SetScheduledEndTime(flipStart);
+                currentPlayingTheme.time = flipStartDelay;
+                if (delay > 0) {
+                    yield return new WaitWhile(() => loopSource.isPlaying);
+                }
+                StopCoroutine(currentCheck);
+            }
+            // This is a constant that should be as close to 0 as possible without making pops so it doesn't get in the way of base game music.
+            const float flipStartDelay = 0.0625f;
+            void LateUpdate() {
+                if (LoopSource != null) {
+                    LoopSource.volume = SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme.volume;
+                }
+            }
+            private void DisableLoopSource() {
+                if (loopSource == null) {return;}
+                loopSource.time = 0;
+                loopSource.Stop();
+                loopSource.clip = null;
+            }
+            static AudioSource loopSource;
+            public AudioSource LoopSource {get => loopSource;}
+            static Coroutine currentLoop;
+            static Coroutine currentCheck;
+            #endregion
+
             #pragma warning restore IDE0051
         }
-        // Legacy cache implementation that's a pain to change and acts as a near-zero overhead redundancy.
+        // Legacy cache implementation that's a pain to change and acts as a near-zero overhead redundancy and longer-term cache.
         private static readonly Dictionary<string, WeakReference<AudioClip>> HeldTheme = new Dictionary<string, WeakReference<AudioClip>>(StringComparer.Ordinal);
-        private static AudioCache CurrentCache = null;
+        internal static AudioCache CurrentCache = null;
         /// <summary>
         /// Sets the current EnemyTheme.
         /// </summary>
@@ -1024,10 +1122,51 @@ namespace CustomMapUtility {
                 Debug.Log($"CustomMapUtility:AudioHandler: Changed EnemyTheme to {bgmName}");
             }
         }
+        public static AudioClip StartEnemyTheme_LoopPair(AudioClip clip, AudioClip loopClip, bool overlap = true, bool changeoverRaw = true, float changeover = 5) => StartEnemyTheme_LoopPair(clip, loopClip, overlap ? loopClip.length : 0, changeoverRaw, changeover);
+        /// <param name="overlap">How far back from the end of the audio file the loop should start in seconds.</param>
+        public static AudioClip StartEnemyTheme_LoopPair(AudioClip clip, AudioClip loopClip, float overlap, bool changeoverRaw = true, float changeover = 5) {
+            if (!changeoverRaw && (changeover < 0 || changeover > 1)) {
+                Debug.LogError($"CustomMapUtility:AudioHandler: changeover isn't raw but not between 0 and 1, defaulting to 0.5f");
+                changeover = 0.5f;
+            } else if (changeoverRaw && changeover > overlap) {
+                string error = $"CustomMapUtility:AudioHandler: changeover is raw but is greater than overlap length, defaulting to non-raw 0.5f";
+                if (changeover == 5) {
+                    Debug.LogWarning(error);
+                } else {
+                    Debug.LogError(error);
+                }
+                changeoverRaw = false;
+                changeover = 0.5f;
+            }
+            if (CurrentCache == null) {
+                CurrentCache = SingletonBehavior<BattleScene>.Instance.gameObject.GetComponent<AudioCache>();
+                if (CurrentCache == null) {
+                    CurrentCache = SingletonBehavior<BattleScene>.Instance.gameObject.AddComponent<AudioCache>();
+                }
+            }
+            if ((CurrentCache.LoopSource?.isPlaying ?? false && SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme.clip == clip) || SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme.clip == loopClip) {
+                return SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme.clip;
+            }
+            CurrentCache.PlayLoopPair(clip, loopClip, overlap, changeoverRaw, changeover);
+            return clip;
+        }
+        public static AudioSource LoopSource {get => CurrentCache?.LoopSource;}
+        public static AudioClip StartEnemyTheme_LoopPair(string clip, string loopClip, bool overlap = true, bool changeoverRaw = true, float changeover = 5) => StartEnemyTheme_LoopPair(GetAudioClip(clip), GetAudioClip(loopClip), overlap, changeoverRaw, changeover);
+        /// <param name="overlap">How far back from the end of the audio file the loop should start in seconds.</param>
+        public static AudioClip StartEnemyTheme_LoopPair(string clip, string loopClip, float overlap, bool changeoverRaw = true, float changeover = 5) => StartEnemyTheme_LoopPair(GetAudioClip(clip), GetAudioClip(loopClip), overlap, changeoverRaw, changeover);
+        public static AudioClip ClipCut(AudioClip clip, int looplength, int loopstart, string name) {
+            var newClip = AudioClip.Create(name, looplength, clip.channels, clip.frequency, false);
+            float[] data = new float[looplength*2];
+            clip.GetData(data, loopstart);
+            newClip.SetData(data, 0);
+            return newClip;
+        }
+        public static AudioClip ClipCut(AudioClip clip, int looplength, int loopstart) => ClipCut(clip, looplength, loopstart, $"{clip.name}_loop");
         /// <summary>
         /// Returns a loaded AudioClip.
         /// </summary>
         /// <param name="bgmName">The name of the audio file (including extension).</param>
+        [Obsolete("Use GetAudioClip instead")]
         public static AudioClip GetEnemyTheme(string bgmName) => GetAudioClip(bgmName);
         /// <summary>
         /// Returns a loaded AudioClip.

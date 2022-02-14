@@ -1125,8 +1125,10 @@ namespace CustomMapUtility {
                 Debug.Log($"CustomMapUtility:AudioHandler: Changed EnemyTheme to {bgmName}");
             }
         }
+        [Obsolete("Not ready yet. Implementation is buggy")]
         public static AudioClip StartEnemyTheme_LoopPair(AudioClip clip, AudioClip loopClip, bool overlap = true, bool changeoverRaw = true, float changeover = 5) => StartEnemyTheme_LoopPair(clip, loopClip, overlap ? loopClip.length : 0, changeoverRaw, changeover);
         /// <param name="overlap">How far back from the end of the audio file the loop should start in seconds.</param>
+        [Obsolete("Not ready yet. Implementation is buggy")]
         public static AudioClip StartEnemyTheme_LoopPair(AudioClip clip, AudioClip loopClip, float overlap, bool changeoverRaw = true, float changeover = 5) {
             if (!changeoverRaw && (changeover < 0 || changeover > 1)) {
                 Debug.LogError($"CustomMapUtility:AudioHandler: changeover isn't raw but not between 0 and 1, defaulting to 0.5f");
@@ -1153,9 +1155,12 @@ namespace CustomMapUtility {
             CurrentCache.PlayLoopPair(clip, loopClip, overlap, changeoverRaw, changeover);
             return clip;
         }
+        [Obsolete("Not ready yet. Implementation is buggy")]
         public static AudioSource LoopSource {get => CurrentCache?.LoopSource;}
+        [Obsolete("Not ready yet. Implementation is buggy")]
         public static AudioClip StartEnemyTheme_LoopPair(string clip, string loopClip, bool overlap = true, bool changeoverRaw = true, float changeover = 5) => StartEnemyTheme_LoopPair(GetAudioClip(clip), GetAudioClip(loopClip), overlap, changeoverRaw, changeover);
         /// <param name="overlap">How far back from the end of the audio file the loop should start in seconds.</param>
+        [Obsolete("Not ready yet. Implementation is buggy")]
         public static AudioClip StartEnemyTheme_LoopPair(string clip, string loopClip, float overlap, bool changeoverRaw = true, float changeover = 5) => StartEnemyTheme_LoopPair(GetAudioClip(clip), GetAudioClip(loopClip), overlap, changeoverRaw, changeover);
         public static AudioClip ClipCut(AudioClip clip, int looplength, int loopstart, string name) {
             var newClip = AudioClip.Create(name, looplength, clip.channels, clip.frequency, false);

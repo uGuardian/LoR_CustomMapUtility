@@ -127,12 +127,7 @@ namespace CustomMapUtility {
 			sephirahColor = Color.black;
 		}
 		string[] IBGM.GetCustomBGMs() => CustomBGMs;
-		/// <summary>
-		/// Override and specify a string array with audio file names (including extensions) for the get parameter.
-		/// </summary>
-		/// <remarks>
-		/// If you put multiple strings in it'll change between them based on emotion level. (Emotion level 0, 2, and 4 respectively).
-		/// </remarks>
+		/// <inheritdoc cref="CustomMapManager.CustomBGMs"/>
 		protected internal virtual string[] CustomBGMs {get;}
 		bool IBGM.AutoBGM {get => AutoBGM; set => AutoBGM = value;}
 		protected internal bool AutoBGM = false;
@@ -140,9 +135,9 @@ namespace CustomMapUtility {
 		public override void CreateDialog() {
 			if (AbnoText != null) {
 				if (AbnoTextColor == null) {
-					_dlgEffect = SingletonBehavior<CreatureDlgManagerUI>.Instance.SetDlg(CreateDialogShared());
+					_dlgEffect = SingletonBehavior<CreatureDlgManagerUI>.Instance.SetDlg(CreateDialog_Shared());
 				} else {
-					_dlgEffect = SingletonBehavior<CreatureDlgManagerUI>.Instance.SetDlg(CreateDialogShared(), AbnoTextColor);
+					_dlgEffect = SingletonBehavior<CreatureDlgManagerUI>.Instance.SetDlg(CreateDialog_Shared(), AbnoTextColor);
 				}
 			} else {
 				IdxIterator(_creatureDlgIdList.Count);
@@ -155,13 +150,13 @@ namespace CustomMapUtility {
 		}
 		public override void CreateDialog(Color txtColor) {
 			if (AbnoText != null) {
-				_dlgEffect = SingletonBehavior<CreatureDlgManagerUI>.Instance.SetDlg(CreateDialogShared(), AbnoTextColor);
+				_dlgEffect = SingletonBehavior<CreatureDlgManagerUI>.Instance.SetDlg(CreateDialog_Shared(), AbnoTextColor);
 			} else {
 				IdxIterator(AbnoText.Count);
 				base.CreateDialog(txtColor);
 			}
 		}
-		protected internal virtual string CreateDialogShared() {
+		protected internal virtual string CreateDialog_Shared() {
 			if (isEgo || AbnoText.Count <= 0) {return null;}
 			IdxIterator(AbnoText.Count);
 			if (_dlgIdx >= AbnoText.Count) {return null;}

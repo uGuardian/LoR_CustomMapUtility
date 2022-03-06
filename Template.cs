@@ -7,7 +7,7 @@ namespace Template {
             // You MUST have <MapInfo>Template</MapInfo> inside your StageInfo.xml file. (Replace Template with your stage name)
             
             // When you call this method, you supply the stage name and then your map manager.
-            CustomMapHandler.InitCustomMap("Template", typeof(TemplateMapManager));
+            CustomMapHandler.InitCustomMap<TemplateMapManager>("Template");
         }
         public override void OnRoundStart() {
             // Calling this will inform the game that the custom map should be the active one. Should be called in OnRoundStart() in a stage manager or passive.

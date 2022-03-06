@@ -28,12 +28,7 @@ namespace CustomMapUtility {
 				}
 				return null;
 			}
-			if (CurrentCache == null) {
-				CurrentCache = SingletonBehavior<BattleScene>.Instance.gameObject.GetComponent<AudioCache>();
-				if (CurrentCache == null) {
-					CurrentCache = SingletonBehavior<BattleScene>.Instance.gameObject.AddComponent<AudioCache>();
-				}
-			}
+			GetCurrentCache();
 			var parsed = new Dictionary<string, AudioClip>(files.Count, StringComparer.OrdinalIgnoreCase);
 			var index = new Dictionary<int, string>(files.Count);
 			for (int i = 0; i < BGMs.Length; i++) {
@@ -317,7 +312,7 @@ namespace CustomMapUtility {
 			void OnDisable() {
 				Dictionary.Clear();
 				StopAllCoroutines();
-				DisableLoopSource();
+				DisableLoopSources();
 				coroutines.Clear();
 				wwwDic.Clear();
 			}
@@ -329,102 +324,117 @@ namespace CustomMapUtility {
 			#region LoopAudio
 			//TODO Add audio queue
 			//TODO Allow ally themes
+			[Obsolete]
 			public void PlayLoopPair(AudioClip clip, AudioClip loopClip, float overlap = 0, bool changeoverRaw = true, float changeover = 2) {
 				float changeoverlap = changeoverRaw ? overlap - changeover : overlap * changeover;
-				SingletonBehavior<BattleSoundManager>.Instance.ChangeCurrentTheme(false);
-				var currentPlayingTheme = SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme;
-				currentPlayingTheme.Stop();
-				if (loopSource == null) {
-					loopSource = Instantiate(currentPlayingTheme, currentPlayingTheme.transform.parent);
-					loopSource.name = "LoopSource";
-				} else {
-					DisableLoopSource();
-					if (currentLoop != null) {
-						StopCoroutine(currentLoop);
-					}
-					if (currentCheck != null) {
-						StopCoroutine(currentCheck);
-					}
-				}
-				currentPlayingTheme.clip = clip;
-				loopSource.clip = loopClip;
+				InitLoopSources();
+				LateUpdate();
+				currentQueue.Stop();
+				currentQueue = new AudioLoopQueue();
+				currentQueue.Init(clip);
 				float delay = clip.length - (overlap - changeoverlap);
-				double dspDelay = AudioSettings.dspTime+0.2;
-				currentPlayingTheme.PlayScheduled(dspDelay);
-				currentPlayingTheme.time = 0;
-				double switchOver = dspDelay+delay;
-				currentPlayingTheme.SetScheduledEndTime(switchOver);
-				loopSource.PlayScheduled(switchOver);
-				loopSource.time = changeoverlap;
-				SingletonBehavior<BattleSoundManager>.Instance.SetEnemyTheme(new AudioClip[]{clip});
-				float remainTime = loopClip.length - changeoverlap;
-				float flipStart = (float)(switchOver + remainTime + flipStartDelay);
-				currentCheck = StartCoroutine(ChangeCheck(clip, loopClip));
-				currentLoop = StartCoroutine(LoopCheck(loopClip, delay, flipStart));
-				if (overlap != 0 && (changeoverlap < flipStartDelay)) {
-					Debug.LogWarning("CustomMapUtility:AudioHandler:LoopClip: Changeover value is probably too high");
-				}
-				/*
-				Debug.LogWarning($"clip.length: {clip.length}");
-				Debug.LogWarning($"loopClip.length: {loopClip.length}");
-				Debug.LogWarning($"overlap: {overlap}");
-				Debug.LogWarning($"changeover: {changeover}");
-				Debug.LogWarning($"changeoverlap: {changeoverlap}");
-				Debug.LogWarning($"delay: {delay}");
-				Debug.LogWarning($"dspDelay: {dspDelay}");
-				Debug.LogWarning($"switchOver: {switchOver}");
-				Debug.LogWarning($"remainTime: {remainTime}");
-				Debug.LogWarning($"flipStart: {flipStart}");
-				*/
+				currentQueue.Enqueue(loopClip, AudioLoopQueue.SwitchMode.Clip,
+					changePeriodStart: delay-changeoverlap, changePeriodEnd: delay+changeoverlap);
 			}
-
-			public IEnumerator ChangeCheck(AudioClip clip, AudioClip loopClip) {
-				yield return new WaitWhile(() => SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme.clip == clip || SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme.clip == loopClip);
-				DisableLoopSource();
-				StopCoroutine(currentLoop);
+			public void ChangeCheck() {
+				currentCheck = StartCoroutine(ChangeCheckCoroutine());
 			}
-			public IEnumerator LoopCheck(AudioClip loopClip, float delay, double flipStart) {
-				var currentPlayingTheme = SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme;
-				if (delay > 0) {
-					yield return new WaitWhile(() => currentPlayingTheme.isPlaying);
-				}
-				while (AudioSettings.dspTime > flipStart) {
-					flipStart += loopClip.length;
-				}
-				currentPlayingTheme.clip = loopClip;
-				SingletonBehavior<BattleSoundManager>.Instance.SetEnemyTheme(new AudioClip[]{loopClip});
-				currentPlayingTheme.PlayScheduled(flipStart);
-				loopSource.SetScheduledEndTime(flipStart);
-				currentPlayingTheme.time = flipStartDelay;
-				if (delay > 0) {
-					yield return new WaitWhile(() => loopSource.isPlaying);
-				}
-				StopCoroutine(currentCheck);
+			public IEnumerator ChangeCheckCoroutine() {
+				yield return new WaitWhile(() => SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme.clip == currentQueue.placeholder);
+				DisableLoopSources();
+				StopCrossFades();
 			}
 			// This is a constant that should be as close to 0 as possible without making pops so it doesn't get in the way of base game music.
 			const float flipStartDelay = 0.0625f;
+			IEnumerator CrossFadeCoroutine(double nextDspTime, double nextDspEndTime) {
+				var active = ActiveLoopSource;
+				var inactive = InactiveLoopSource;
+				inactive.volume = 0;
+				var interval = nextDspEndTime - nextDspTime;
+				yield return new WaitWhile(() => AudioSettings.dspTime < nextDspTime);
+				activeTransition = true;
+				while (AudioSettings.dspTime < nextDspEndTime) {
+					var volume = SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme.volume;
+					float current = (float)((AudioSettings.dspTime - nextDspTime) / interval);
+					active.volume = Mathf.Lerp(0f, volume, current);
+					inactive.volume = Mathf.Lerp(volume, 0f, current);
+					yield return null;
+				}
+				FlipLoopSource();
+				InactiveLoopSource.Stop();
+				currentQueue.currentDspTime = nextDspTime;
+				currentQueue.Next();
+				activeTransition = false;
+			}
+			public void CrossFade(double nextDspTime, double nextDspEndTime)
+				=> CrossFadeRoutine = StartCoroutine(CrossFadeCoroutine(nextDspTime, nextDspEndTime));
 			void LateUpdate() {
-				if (LoopSource != null) {
-					LoopSource.volume = SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme.volume;
+				if (!activeTransition) {
+					foreach (var loopSource in loopSources) {
+						if (loopSource != null) {
+							loopSource.volume = SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme.volume;
+						}
+					}
 				}
 			}
-			private void DisableLoopSource() {
-				if (loopSource == null) {return;}
-				loopSource.time = 0;
-				loopSource.Stop();
-				loopSource.clip = null;
+			public void StopCrossFades() {
+				foreach (var coroutine in crossFadeRoutines) {
+					StopCoroutine(coroutine);
+				}
 			}
-			static AudioSource loopSource;
-			public AudioSource LoopSource {get => loopSource;}
-			static Coroutine currentLoop;
-			static Coroutine currentCheck;
-			#endregion
+			public void DisableLoopSources() {
+				foreach (var loopSource in loopSources) {
+					if (loopSource != null) {
+						loopSource.time = 0;
+						loopSource.Stop();
+						loopSource.clip = null;
+					}
+				}
+			}
+			AudioSource FlipLoopSource() {
+				activeLoopSource ^= true;
+				loopSources[activeLoopSource ? 1 : 0].name = "LoopSource_Active";
+				loopSources[activeLoopSource ? 0 : 1].name = "LoopSource_Inactive";
+				return loopSources[activeLoopSource ? 1 : 0];
+			}
+			public void InitLoopSources() {
+				var currentTheme = SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme;
+				if (loopSources[0] == null || loopSources[1] == null) {
+					loopSources[0] = Instantiate(currentTheme, currentTheme.transform);
+					loopSources[1] = Instantiate(currentTheme, currentTheme.transform);
+					FlipLoopSource();
+				}
+			}
 
+			public AudioSource ActiveLoopSource => loopSources[activeLoopSource ? 1 : 0];
+			public AudioSource InactiveLoopSource => loopSources[activeLoopSource ? 0 : 1];
+			bool activeLoopSource;
+			static readonly AudioSource[] loopSources = new AudioSource[2];
+			public AudioSource[] LoopSources {get => loopSources;}
+			static Coroutine currentCheck;
+			static readonly Coroutine[] crossFadeRoutines = new Coroutine[3];
+			static Coroutine CrossFadeRoutine {get => crossFadeRoutines[0]; set => crossFadeRoutines[0] = value;}
+			static Coroutine FadeInRoutine {get => crossFadeRoutines[1]; set => crossFadeRoutines[1] = value;}
+			static Coroutine FadeOutRoutine {get => crossFadeRoutines[2]; set => crossFadeRoutines[2] = value;}
+
+			public static AudioLoopQueue currentQueue;
+			bool activeTransition = false;
+			public readonly Dictionary<object, AudioLoopQueue> queueDictionary = new Dictionary<object, AudioLoopQueue>();
+			#endregion
 			#pragma warning restore IDE0051
 		}
 		// Legacy cache implementation that's a pain to change and acts as a near-zero overhead redundancy and longer-term cache.
 		private static readonly Dictionary<string, WeakReference<AudioClip>> HeldTheme = new Dictionary<string, WeakReference<AudioClip>>(StringComparer.Ordinal);
 		internal static AudioCache CurrentCache = null;
+		internal static AudioCache GetCurrentCache() {
+			if (CurrentCache == null) {
+				CurrentCache = SingletonBehavior<BattleScene>.Instance.gameObject.GetComponent<AudioCache>();
+				if (CurrentCache == null) {
+					CurrentCache = SingletonBehavior<BattleScene>.Instance.gameObject.AddComponent<AudioCache>();
+				}
+			}
+			return CurrentCache;
+		}
 		/// <summary>
 		/// Sets the current EnemyTheme.
 		/// </summary>
@@ -451,12 +461,7 @@ namespace CustomMapUtility {
 					return;
 				}
 			}
-			if (CurrentCache == null) {
-				CurrentCache = SingletonBehavior<BattleScene>.Instance.gameObject.GetComponent<AudioCache>();
-				if (CurrentCache == null) {
-					CurrentCache = SingletonBehavior<BattleScene>.Instance.gameObject.AddComponent<AudioCache>();
-				}
-			}
+			GetCurrentCache();
 			CustomBgmParseAsync(bgmName);
 			Debug.Log($"CustomMapUtility:AudioHandler: Async EnemyTheme {bgmName}");
 		}
@@ -492,10 +497,8 @@ namespace CustomMapUtility {
 				Debug.Log($"CustomMapUtility:AudioHandler: Changed EnemyTheme to {bgmName}");
 			}
 		}
-		[Obsolete("Not ready yet. Implementation is buggy")]
 		public static AudioClip StartEnemyTheme_LoopPair(AudioClip clip, AudioClip loopClip, bool overlap = true, bool changeoverRaw = true, float changeover = 5) => StartEnemyTheme_LoopPair(clip, loopClip, overlap ? loopClip.length : 0, changeoverRaw, changeover);
 		/// <param name="overlap">How far back from the end of the audio file the loop should start in seconds.</param>
-		[Obsolete("Not ready yet. Implementation is buggy")]
 		public static AudioClip StartEnemyTheme_LoopPair(AudioClip clip, AudioClip loopClip, float overlap, bool changeoverRaw = true, float changeover = 5) {
 			if (!changeoverRaw && (changeover < 0 || changeover > 1)) {
 				Debug.LogError($"CustomMapUtility:AudioHandler: changeover isn't raw but not between 0 and 1, defaulting to 0.5f");
@@ -510,24 +513,259 @@ namespace CustomMapUtility {
 				changeoverRaw = false;
 				changeover = 0.5f;
 			}
-			if (CurrentCache == null) {
-				CurrentCache = SingletonBehavior<BattleScene>.Instance.gameObject.GetComponent<AudioCache>();
-				if (CurrentCache == null) {
-					CurrentCache = SingletonBehavior<BattleScene>.Instance.gameObject.AddComponent<AudioCache>();
-				}
-			}
-			if (((CurrentCache.LoopSource?.isPlaying ?? false) && SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme.clip == clip) || SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme.clip == loopClip) {
+			GetCurrentCache();
+			if ((CurrentCache.ActiveLoopSource?.clip == clip) || CurrentCache.ActiveLoopSource?.clip == loopClip) {
 				return SingletonBehavior<BattleSoundManager>.Instance.CurrentPlayingTheme.clip;
 			}
 			CurrentCache.PlayLoopPair(clip, loopClip, overlap, changeoverRaw, changeover);
 			return clip;
 		}
-		[Obsolete("Not ready yet. Implementation is buggy")]
-		public static AudioSource LoopSource {get => CurrentCache?.LoopSource;}
-		[Obsolete("Not ready yet. Implementation is buggy")]
+		public class AudioLoopQueue {
+			public void Init(AudioClip clip) {
+				currentPlaying = clip;
+				var loopSource = GetCurrentCache().ActiveLoopSource;
+				loopSource.Stop();
+				loopSource.time = 0;
+				loopSource.clip = clip;
+				currentDspTime = AudioSettings.dspTime+0.2;
+				loopSource.PlayScheduled(currentDspTime);
+			}
+			public void Play(AudioClip clip, bool force = false) {
+				var loopSource = GetCurrentCache().ActiveLoopSource;
+				if (currentPlaying == null || force) {
+					Init(clip);
+				}
+				Play();
+			}
+			public void Play() {
+				var loopSource = GetCurrentCache().ActiveLoopSource;
+				if (currentPlaying != null) {
+					loopSource.clip = currentPlaying;
+					StartCallback.Invoke(this);
+				}
+			}
+			public void Enqueue(Entry entry) {
+				queue.Enqueue(entry);
+				if (nextPlaying == null) {
+					Next();
+				}
+			}
+
+			public void Enqueue(AudioClip clip, SwitchMode switchMode = SwitchMode.CrossFade, float fadeOut = 0, float fadeIn = 0,
+				bool lengthFormat = false, int changePeriodStart = 0, int changePeriodEnd = 0, int offset = 0) {
+					throw new NotImplementedException("SamplesMode not ready yet");
+					queue.Enqueue(new Entry(clip, switchMode, fadeOut, fadeIn, lengthFormat, changePeriodStart, changePeriodEnd));
+					if (nextPlaying == null) {
+						Next();
+					}
+			}
+
+			public void Enqueue(AudioClip clip, SwitchMode switchMode = SwitchMode.CrossFade, float fadeOut = 0, float fadeIn = 0,
+				bool lengthFormat = false, float changePeriodStart = 0, float changePeriodEnd = 0, float offset = 0) {
+					queue.Enqueue(new Entry(clip, switchMode, fadeOut, fadeIn, lengthFormat, changePeriodStart, changePeriodEnd));
+					if (nextPlaying == null) {
+						Next();
+					}
+			}
+			/// <summary>
+			/// Removes the next entry without changing the song
+			/// </summary>
+			/// <returns>The removed entry</returns>
+			public Entry CancelNext() {
+				if (nextPlaying != null) {
+					var temp = nextPlaying;
+					nextPlaying = null;
+					return temp;
+				} else {
+					return null;
+				}
+			}
+			/// <summary>
+			/// Removes the entry after the next without changing the song
+			/// </summary>
+			/// <returns>The removed entry</returns>
+			public Entry Dequeue() {
+				if (queue.Count > 0) {
+					var next = queue.Dequeue();
+					return queue.Dequeue();
+				} else {
+					nextPlaying = null;
+					return null;
+				}
+			}
+			public void Next() {
+				if (queue.Count > 0) {
+					var active = ActiveLoopSource;
+					var inactive = InactiveLoopSource;
+					var next = queue.Dequeue();
+					inactive.clip = next.clip;
+					switch (next.switchMode) {
+						case SwitchMode.Clip when next.timeMode:
+							nextDspEndTime = nextDspTime;
+							throw new NotImplementedException();
+						case SwitchMode.Clip:
+							nextDspEndTime = nextDspTime;
+							throw new NotImplementedException("SamplesMode not ready yet");
+
+						case SwitchMode.CrossFade when next.timeMode:
+							double catchUp = currentDspTime;
+							catchUp += next.timePeriod.changePeriodStart;
+							catchUp += currentPlaying.length;
+							while (catchUp + next.timePeriod.changePeriodStart < AudioSettings.dspTime) {
+								currentDspTime += currentPlaying.length;
+								catchUp += currentPlaying.length;
+							}
+							nextDspTime = currentDspTime + next.timePeriod.changePeriodStart;
+							nextDspEndTime = currentDspTime + next.timePeriod.changePeriodEnd;
+							if (next.fadeIn == 0 && next.fadeOut == 0) {
+								GetCurrentCache().CrossFade(nextDspTime, nextDspEndTime);
+							} else {
+								throw new NotImplementedException();
+							}
+							break;
+						case SwitchMode.CrossFade:
+							throw new NotImplementedException("SamplesMode not ready yet");
+
+						case SwitchMode.Overlap when next.timeMode:
+							
+							if (next.fadeIn == 0 && next.fadeOut == 0) {
+							}
+							break;
+						case SwitchMode.Overlap:
+							throw new NotImplementedException("SamplesMode not ready yet");
+					}
+					inactive.PlayScheduled(nextDspTime);
+					active.SetScheduledEndTime(nextDspEndTime);
+					nextPlaying = next;
+				}
+			}
+			public Entry Peek() {
+				if (queue.Count > 0) {
+					return queue.Peek();
+				} else {
+					return null;
+				}
+			}
+
+			public delegate void ResetEvent(AudioLoopQueue queue);
+			public event ResetEvent ResetCallback;
+			public void Reset() {
+				var active = ActiveLoopSource;
+				currentPos = active.time;
+				currentPosSamples = active.timeSamples;
+				InactiveLoopSource.Stop();
+				CurrentCache.StopCrossFades();
+				ResetCallback.Invoke(this);
+			}
+			/// <remarks>
+			/// Alias for Stop
+			/// </remarks>
+			public void Pause() => Stop();
+			public void Stop() {
+				Reset();
+				GetCurrentCache().DisableLoopSources();
+			}
+			public delegate void StartEvent(AudioLoopQueue queue);
+			public event StartEvent StartCallback;
+			public void Clear() => queue.Clear();
+
+			readonly Queue<Entry> queue = new Queue<Entry>();
+			public AudioClip currentPlaying;
+			public Entry nextPlaying;
+			public int iteration;
+			public readonly AudioClip placeholder = AudioClip.Create("Placeholder", 1, 1, 1, false);
+			public AudioSource ActiveLoopSource => GetCurrentCache().ActiveLoopSource;
+			public AudioSource InactiveLoopSource => GetCurrentCache().InactiveLoopSource;
+			public double currentDspTime;
+			public double nextDspTime;
+			public double nextDspEndTime;
+			public float currentPos;
+			public float currentPosSamples;
+
+			public class Entry {
+				public Entry(AudioClip clip, SwitchMode switchMode = SwitchMode.CrossFade, float fadeIn = 0, float fadeOut = 0,
+					bool lengthFormat = false, int changePeriodStart = 0, int changePeriodEnd = 0, int offset = 0) {
+						this.clip = clip;
+						if (switchMode != SwitchMode.Clip) {
+							this.fadeOut = fadeOut;
+							this.fadeIn = fadeIn;
+						}
+						if (lengthFormat) {
+							changePeriodEnd += changePeriodStart;
+						}
+						if (changePeriodEnd <= changePeriodStart || changePeriodEnd > clip.samples) {
+							changePeriodEnd = clip.samples;
+						}
+						samplesPeriod = new SamplesPeriod(changePeriodStart, changePeriodEnd, offset);
+						timeMode = false;
+						this.switchMode = switchMode;
+						throw new NotImplementedException("SamplesMode not ready yet");
+				}
+				public Entry(AudioClip clip, SwitchMode switchMode = SwitchMode.CrossFade, float fadeOut = 0, float fadeIn = 0,
+					bool lengthFormat = false, float changePeriodStart = 0, float changePeriodEnd = 0, float offset = 0) {
+						this.clip = clip;
+						if (switchMode != SwitchMode.Clip) {
+							this.fadeOut = fadeOut;
+							this.fadeIn = fadeIn;
+						}
+						if (lengthFormat) {
+							changePeriodEnd += changePeriodStart;
+						}
+						if (changePeriodEnd <= changePeriodStart || changePeriodEnd > clip.samples) {
+							changePeriodEnd = clip.samples;
+						}
+						timePeriod = new TimePeriod(changePeriodStart, changePeriodEnd, offset);
+						timeMode = true;
+						this.switchMode = switchMode;
+				}
+
+				public readonly AudioClip clip;
+				public readonly float fadeOut;
+				public readonly float fadeIn;
+				public readonly SamplesPeriod samplesPeriod;
+				public readonly TimePeriod timePeriod;
+				public readonly struct SamplesPeriod {
+					public SamplesPeriod(int changePeriodStart, int changePeriodEnd, int offset) {
+						this.changePeriodStart = changePeriodStart;
+						this.changePeriodEnd = changePeriodEnd;
+						this.offset = offset;
+					}
+					public readonly int changePeriodStart;
+					public readonly int changePeriodEnd;
+					public readonly int offset;
+				}
+				public readonly struct TimePeriod {
+					public TimePeriod(float changePeriodStart, float changePeriodEnd, float offset) {
+						this.changePeriodStart = changePeriodStart;
+						this.changePeriodEnd = changePeriodEnd;
+						this.offset = offset;
+					}
+					public readonly float changePeriodStart;
+					public readonly float changePeriodEnd;
+					public readonly float offset;
+				}
+				public readonly bool timeMode;
+				public readonly SwitchMode switchMode;
+			}
+			public enum SwitchMode {
+				Clip,
+				CrossFade,
+				Overlap,
+			}
+		}
+		public static AudioSource[] LoopSources {get => CurrentCache?.LoopSources;}
+		public static AudioLoopQueue GetAudioLoopQueue(object key) {
+			GetCurrentCache().InitLoopSources();
+			if (CurrentCache.queueDictionary.ContainsKey(key)) {
+				return CurrentCache.queueDictionary[key];
+			} else {
+				var queue = new AudioLoopQueue();
+				CurrentCache.queueDictionary[key] = queue;
+				return queue;
+			}
+		}
 		public static AudioClip StartEnemyTheme_LoopPair(string clip, string loopClip, bool overlap = true, bool changeoverRaw = true, float changeover = 5) => StartEnemyTheme_LoopPair(GetAudioClip(clip), GetAudioClip(loopClip), overlap, changeoverRaw, changeover);
 		/// <param name="overlap">How far back from the end of the audio file the loop should start in seconds.</param>
-		[Obsolete("Not ready yet. Implementation is buggy")]
 		public static AudioClip StartEnemyTheme_LoopPair(string clip, string loopClip, float overlap, bool changeoverRaw = true, float changeover = 5) => StartEnemyTheme_LoopPair(GetAudioClip(clip), GetAudioClip(loopClip), overlap, changeoverRaw, changeover);
 		public static AudioClip ClipCut(AudioClip clip, int looplength, int loopstart, string name) {
 			var newClip = AudioClip.Create(name, looplength, clip.channels, clip.frequency, false);
@@ -536,7 +774,34 @@ namespace CustomMapUtility {
 			newClip.SetData(data, 0);
 			return newClip;
 		}
-		public static AudioClip ClipCut(AudioClip clip, int looplength, int loopstart) => ClipCut(clip, looplength, loopstart, $"{clip.name}_loop");
+		public static AudioClip[] ClipCut(AudioClip clip, int[] breakPoints, string name) {
+			int entries = breakPoints.Length+1;
+			AudioClip[] newClips = new AudioClip[entries];
+			try {
+				for (int i = 0; i < breakPoints.Length; i++) {
+					newClips[i] = AudioClip.Create($"{name}_{i}", breakPoints[i], clip.channels, clip.frequency, false);
+					float[] data = new float[breakPoints[i] * clip.channels];
+					int loopstart = 0;
+					if (i > 0) {
+						loopstart = breakPoints[i-1];
+					}
+					clip.GetData(data, loopstart);
+					newClips[i].SetData(data, 0);
+				}
+				newClips[entries] = AudioClip.Create($"{name}_{entries}", breakPoints[entries], clip.channels, clip.frequency, false);
+				float[] data2 = new float[clip.samples * clip.channels];
+				clip.GetData(data2, breakPoints[entries - 1]);
+				newClips[entries].SetData(data2, 0);
+			} catch (Exception ex) {
+				Debug.LogException(ex);
+			}
+			return newClips;
+		}
+		public static AudioClip ClipCut(AudioClip clip, int looplength, int loopstart)
+			=> ClipCut(clip, looplength, loopstart, $"{clip.name}_loop");
+		public static AudioClip[] ClipCut(AudioClip clip, int[] breakPoints)
+			=> ClipCut(clip, breakPoints, $"{clip.name}_loop");
+		
 		/// <inheritdoc cref="GetAudioClip(string)"/>
 		[Obsolete("Use GetAudioClip instead")]
 		public static AudioClip GetEnemyTheme(string bgmName) => GetAudioClip(bgmName);

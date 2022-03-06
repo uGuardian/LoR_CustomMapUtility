@@ -75,7 +75,7 @@ namespace CustomMapUtility {
 		/// <remarks>
 		/// If you put multiple strings in it'll change between them based on emotion level. (Emotion level 0, 2, and 4 respectively).
 		/// </remarks>
-		protected internal virtual string[] CustomBGMs {get;}
+		protected internal virtual string[] CustomBGMs => null;
 		bool IBGM.AutoBGM {get => AutoBGM; set => AutoBGM = value;}
 		protected internal bool AutoBGM = false;
 	}
@@ -125,56 +125,97 @@ namespace CustomMapUtility {
 			// This makes the map not have the sephirah filter
 			sephirahType = SephirahType.None;
 			sephirahColor = Color.black;
+			if (AbnoText != null) {
+				AbnoTextList.AddRange(AbnoText);
+			}
+			SingletonBehavior<CreatureDlgManagerUI>.Instance.Init(true);
 		}
 		string[] IBGM.GetCustomBGMs() => CustomBGMs;
 		/// <inheritdoc cref="CustomMapManager.CustomBGMs"/>
-		protected internal virtual string[] CustomBGMs {get;}
+		protected internal virtual string[] CustomBGMs => null;
 		bool IBGM.AutoBGM {get => AutoBGM; set => AutoBGM = value;}
 		protected internal bool AutoBGM = false;
 
 		public override void CreateDialog() {
-			if (AbnoText != null) {
+			if (AbnoTextList.Count > 0) {
 				if (AbnoTextColor == null) {
 					_dlgEffect = SingletonBehavior<CreatureDlgManagerUI>.Instance.SetDlg(CreateDialog_Shared());
 				} else {
-					_dlgEffect = SingletonBehavior<CreatureDlgManagerUI>.Instance.SetDlg(CreateDialog_Shared(), AbnoTextColor);
+					_dlgEffect = SingletonBehavior<CreatureDlgManagerUI>.Instance.SetDlg(CreateDialog_Shared(), AbnoTextColor.GetValueOrDefault());
 				}
 			} else {
 				IdxIterator(_creatureDlgIdList.Count);
 				if (AbnoTextColor == null) {
 					base.CreateDialog();
 				} else {
-					base.CreateDialog(AbnoTextColor);
+					base.CreateDialog(AbnoTextColor.GetValueOrDefault());
 				}
 			}
 		}
 		public override void CreateDialog(Color txtColor) {
-			if (AbnoText != null) {
-				_dlgEffect = SingletonBehavior<CreatureDlgManagerUI>.Instance.SetDlg(CreateDialog_Shared(), AbnoTextColor);
+			if (AbnoTextList.Count > 0) {
+				_dlgEffect = SingletonBehavior<CreatureDlgManagerUI>.Instance.SetDlg(CreateDialog_Shared(), AbnoTextColor.GetValueOrDefault());
 			} else {
-				IdxIterator(AbnoText.Count);
+				IdxIterator(AbnoTextList.Count);
 				base.CreateDialog(txtColor);
 			}
 		}
+		/// <summary>
+		/// Returns the next abnormality text. 
+		/// </summary>
+		/// <returns>A dialog string</returns>
 		protected internal virtual string CreateDialog_Shared() {
-			if (isEgo || AbnoText.Count <= 0) {return null;}
-			IdxIterator(AbnoText.Count);
-			if (_dlgIdx >= AbnoText.Count) {return null;}
+			if ((isEgo && !AbnoTextForce) || AbnoTextList.Count <= 0) {return null;}
+			IdxIterator(AbnoTextList.Count);
+			if (_dlgIdx >= AbnoTextList.Count) {return null;}
 			if (_dlgEffect != null && _dlgEffect.gameObject != null) {
 				_dlgEffect.FadeOut();
 			}
 			return AbnoText[_dlgIdx];
 		}
+		/// <summary>
+		/// Chooses a list entry to pull abnormality text from.
+		/// </summary>
 		protected internal virtual void IdxIterator(int totalEntries) {
+			if (totalEntries <= 0) {return;}
 			if (!AbnoTextRandomOrder) {
 				_dlgIdx %= totalEntries;
 			} else {
 				_dlgIdx = UnityEngine.Random.Range(0, totalEntries);
 			}
 		}
+		/// <summary>
+		/// Whether abnormality text is chosen sequentially or randomly.
+		/// </summary>
+		/// <remarks>
+		/// You can override <c>IdxIterator(int totalEntries)</c> for finer control.
+		/// </remarks>
 		protected internal virtual bool AbnoTextRandomOrder => false;
-		protected internal virtual List<string> AbnoText => null;
-		protected internal virtual Color AbnoTextColor {get;}
+		/// <summary>
+		/// Override and specify a string array with abnormality text.
+		/// </summary>
+		/// <remarks>
+		/// This is an auto-fill helper for <c>AbnoTextList</c>.
+		/// </remarks>
+		protected internal virtual string[] AbnoText => null;
+		/// <summary>
+		/// The list of strings that will be displayed as the abnormality text.
+		/// </summary>
+		/// <remarks>
+		/// If this isn't empty, the default handler won't check XML entries anymore.
+		/// </remarks>
+		public readonly List<string> AbnoTextList = new List<string>(){};
+		/// <summary>
+		/// If not null, changes the abnormality text color.
+		/// </summary>
+		protected internal virtual Color? AbnoTextColor => null;
+		/// <summary>
+		/// Forces the abno text to appear even for EGO maps
+		/// </summary>
+		/// <remarks>
+		/// This isn't reccomended to use by itself, it's better to override <c>CreateDialogShared()</c> for finer control
+		/// </remarks>
+		protected internal virtual bool AbnoTextForce => false;
 	}
 	#endregion
 }

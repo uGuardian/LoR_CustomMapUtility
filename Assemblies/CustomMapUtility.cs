@@ -547,9 +547,9 @@ namespace CustomMapUtility {
 		public static class ModResources {
 			public class CacheInit : ModInitializer {
 				#if !NOMP3
-				public const string version = "2.3.0";
+				public const string version = "2.4.0";
 				#else
-				public const string version = "2.3.0-NOMP3";
+				public const string version = "2.4.0-NOMP3";
 				#endif
 				public override void OnInitializeMod()
 				{

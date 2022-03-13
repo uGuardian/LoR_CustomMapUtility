@@ -673,7 +673,11 @@ namespace CustomMapUtility {
 		/// </summary>
 		/// <param name="num">Which map from the stage XML is chosen, or -1 for the Sephirah Map</param>
 		public static void EnforceMap(int num = 0) {
-			EnforceTheme();
+			if (num >= 0) {
+				EnforceTheme();
+			} else {
+				UnEnforceTheme();
+			}
 			Singleton<StageController>.Instance.GetStageModel().SetCurrentMapInfo(num);
 		}
 		/// <summary>
@@ -682,6 +686,17 @@ namespace CustomMapUtility {
 		public static void EnforceTheme() {
 			var emotionTotalCoinNumber = Singleton<StageController>.Instance.GetCurrentStageFloorModel().team.emotionTotalCoinNumber;
 			Singleton<StageController>.Instance.GetCurrentWaveModel().team.emotionTotalBonus = emotionTotalCoinNumber + 1;
+		}
+		public static void UnEnforceTheme(bool force = false) {
+			var emotionTotalCoinNumber = Singleton<StageController>.Instance.GetCurrentStageFloorModel().team.emotionTotalCoinNumber;
+			var stageFloorModel = Singleton<StageController>.Instance.GetCurrentStageFloorModel();
+			var waveModel = Singleton<StageController>.Instance.GetCurrentWaveModel();
+			// An imperfect attempt to account for other things setting the theme without causing a turn of player theme.
+			if (force
+				|| emotionTotalCoinNumber + 1 != waveModel.team.emotionTotalBonus
+				|| stageFloorModel.team.emotionLevel == stageFloorModel.team.emotionLevelMax) {
+					waveModel.team.emotionTotalBonus = 0;
+			}
 		}
 		#endregion
 	}

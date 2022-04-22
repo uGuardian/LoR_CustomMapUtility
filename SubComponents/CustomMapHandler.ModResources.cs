@@ -31,9 +31,9 @@ namespace CustomMapUtility {
 				#else
 					#warning PRERELEASE
 					#if !NOMP3
-						public const string version = "2.4.0-PRERELEASE";
+						public const string version = "PRERELEASE-BGM_Arrays";
 					#else
-						public const string version = "2.4.0-NOMP3-PRERELEASE";
+						public const string version = "PRERELEASE-BGM_Arrays-NOMP3";
 					#endif
 				#endif
 				public override void OnInitializeMod()

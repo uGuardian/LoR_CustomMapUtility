@@ -425,6 +425,8 @@ namespace CustomMapUtility {
 		// Legacy cache implementation that's a pain to change and acts as a near-zero overhead redundancy and longer-term cache.
 		private static readonly Dictionary<string, WeakReference<AudioClip>> HeldTheme = new Dictionary<string, WeakReference<AudioClip>>(StringComparer.Ordinal);
 		internal static AudioCache CurrentCache = null;
+		// REVIEW Consider refactoring
+		
 		/// <summary>
 		/// Sets the current EnemyTheme.
 		/// </summary>
@@ -438,6 +440,21 @@ namespace CustomMapUtility {
 				Debug.Log($"CustomMapUtility:AudioHandler: Changed EnemyTheme to {bgmName} and enforced it");
 			} else {
 				Debug.Log($"CustomMapUtility:AudioHandler: Changed EnemyTheme to {bgmName}");
+			}
+		}
+		/// <summary>
+		/// Sets the current EnemyThemes.
+		/// </summary>
+		/// <param name="bgmNames">An array of audio file names (including extensions).</param>
+		/// <param name="immediate">Whether it immediately forces the music to change</param>
+		public static void SetEnemyTheme(string[] bgmNames, bool immediate = true) {
+			LoadEnemyTheme(bgmNames, out var themes);
+			SingletonBehavior<BattleSoundManager>.Instance.SetEnemyTheme(themes);
+			if (immediate) {
+				SingletonBehavior<BattleSoundManager>.Instance.ChangeEnemyTheme(0);
+				Debug.Log($"CustomMapUtility:AudioHandler: Changed EnemyTheme to {bgmNames[0]} + others and enforced it");
+			} else {
+				Debug.Log($"CustomMapUtility:AudioHandler: Changed EnemyTheme to {bgmNames[0]} + others");
 			}
 		}
 		/// <summary>
@@ -461,6 +478,11 @@ namespace CustomMapUtility {
 			Debug.Log($"CustomMapUtility:AudioHandler: Async EnemyTheme {bgmName}");
 		}
 		/// <summary>
+		/// Preloads multiple sound files to be used with other functions.
+		/// </summary>
+		/// <param name="bgmNames">An array of audio file names (including extensions).</param>
+		public static void LoadEnemyTheme(string[] bgmNames) => GetAudioClip(bgmNames);
+		/// <summary>
 		/// Loads a sound file and outputs it as an AudioClip.
 		/// </summary>
 		/// <param name="bgmName">The name of the audio file (including extension).</param>
@@ -468,6 +490,15 @@ namespace CustomMapUtility {
 		public static void LoadEnemyTheme(string bgmName, out AudioClip clip) {
 			clip = CustomBgmParse(bgmName);
 			Debug.Log($"CustomMapUtility:AudioHandler: Loaded EnemyTheme {bgmName}");
+		}
+		/// <summary>
+		/// Loads multiple sound files and outputs it as an AudioClip array.
+		/// </summary>
+		/// <param name="bgmNames">An array of audio file names (including extensions).</param>
+		/// <param name="clip">The loaded AudioClip</param>
+		public static void LoadEnemyTheme(string[] bgmNames, out AudioClip[] clips) {
+			clips = CustomBgmParse(bgmNames);
+			Debug.Log($"CustomMapUtility:AudioHandler: Loaded EnemyTheme {bgmNames[0]} + others");
 		}
 		/// <summary>
 		/// Starts the last loaded AudioClip.
@@ -490,6 +521,21 @@ namespace CustomMapUtility {
 				Debug.Log($"CustomMapUtility:AudioHandler: Changed EnemyTheme to {bgmName} and enforced it");
 			} else {
 				Debug.Log($"CustomMapUtility:AudioHandler: Changed EnemyTheme to {bgmName}");
+			}
+		}
+		/// <summary>
+		/// Sets the current EnemyTheme using a loaded AudioClip array.
+		/// </summary>
+		/// <param name="bgmNames">An array of audio file names (including extensions).</param>
+		/// <param name="immediate">Whether it immediately forces the music to change</param>
+		public static void StartEnemyTheme(string[] bgmNames, bool immediate = true) {
+			var themes = GetAudioClip(bgmNames);
+			SingletonBehavior<BattleSoundManager>.Instance.SetEnemyTheme(themes);
+			if (immediate) {
+				SingletonBehavior<BattleSoundManager>.Instance.ChangeEnemyTheme(0);
+				Debug.Log($"CustomMapUtility:AudioHandler: Changed EnemyTheme to {bgmNames[0]} + others and enforced it");
+			} else {
+				Debug.Log($"CustomMapUtility:AudioHandler: Changed EnemyTheme to {bgmNames[0]} + others");
 			}
 		}
 		[Obsolete("Not ready yet. Implementation is buggy")]
@@ -563,7 +609,7 @@ namespace CustomMapUtility {
 			Debug.Log($"CustomMapUtility:AudioHandler: Got EnemyTheme {bgmName}");
 			return theme;
 		}
-		/// <param name="bgmNames">An array of the names of the audio files (including extension).</param>
+		/// <param name="bgmNames">An array of audio file names (including extensions).</param>
 		/// <returns>An array of loaded AudioClips</returns>
 		public static AudioClip[] GetAudioClip(string[] bgmNames) {
 			AudioClip[] themes = new AudioClip[bgmNames.Length];
@@ -619,6 +665,39 @@ namespace CustomMapUtility {
 				SingletonBehavior<BattleSoundManager>.Instance.ChangeEnemyTheme(0);
 			}
 		}
+		/// <summary>
+		/// Sets the specified map's mapBgm.
+		/// </summary>
+		/// <remarks>
+		/// If <paramref name="mapName"/> is null, changes Sephirah's mapBgm instead.
+		/// Also sets EnemyTheme to be sure.
+		/// </remarks>
+		/// <param name="bgmNames">The name of the audio file (including extension).</param>
+		/// <param name="immediate">Whether it immediately forces the music to change</param>
+		/// <param name="mapName">The name of the target map</param>
+		public static void SetMapBgm(string[] bgmNames, bool immediate = true, string mapName = null) {
+			LoadEnemyTheme(bgmNames, out var clips);
+			MapManager manager;
+			if (mapName == null) {
+				Debug.LogWarning("CustomMapUtility:AudioHandler: Setting sephirah map's BGM");
+				if (SingletonBehavior<BattleSceneRoot>.Instance.mapList != null) {
+					manager = SingletonBehavior<BattleSceneRoot>.Instance.mapList.Find((MapManager x) => x.sephirahType == Singleton<StageController>.Instance.CurrentFloor);
+					manager.mapBgm = clips;
+				} else {return;}
+			} else {
+				List<MapManager> addedMapList = SingletonBehavior<BattleSceneRoot>.Instance.GetType().GetField("_addedMapList", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(SingletonBehavior<BattleSceneRoot>.Instance) as List<MapManager>;
+				manager = addedMapList?.Find((MapManager x) => x.name.Contains(mapName));
+				if (manager == null) {
+					Debug.LogError("CustomMapUtility:AudioHandler: Map not initialized");
+					return;
+				}
+				manager.mapBgm = clips;
+			}
+			SingletonBehavior<BattleSoundManager>.Instance.SetEnemyTheme(clips);
+			if (immediate) {
+				SingletonBehavior<BattleSoundManager>.Instance.ChangeEnemyTheme(0);
+			}
+		}
 		/// <inheritdoc cref="SetMapBgm(string, bool, string)"/>
 		[Obsolete("Please use SetMapBgm(string, bool, string) instead")]
 		public static void LoadMapBgm(string bgmName, bool immediate = true) => SetMapBgm(bgmName, immediate);
@@ -646,6 +725,37 @@ namespace CustomMapUtility {
 		/// <param name="mapName">The name of the target map</param>
 		public static void StartMapBgm(string bgmName, bool immediate = true, string mapName = null) {
 			var clips = new AudioClip[]{GetAudioClip(bgmName)};
+			MapManager manager;
+			if (mapName == null) {
+				Debug.LogWarning("CustomMapUtility:AudioHandler: Setting sephirah map's BGM");
+				if (SingletonBehavior<BattleSceneRoot>.Instance.mapList != null) {
+					manager = SingletonBehavior<BattleSceneRoot>.Instance.mapList.Find((MapManager x) => x.sephirahType == Singleton<StageController>.Instance.CurrentFloor);
+					manager.mapBgm = clips;
+				} else {return;}
+			} else {
+				List<MapManager> addedMapList = SingletonBehavior<BattleSceneRoot>.Instance.GetType().GetField("_addedMapList", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(SingletonBehavior<BattleSceneRoot>.Instance) as List<MapManager>;
+				manager = addedMapList?.Find((MapManager x) => x.name.Contains(mapName));
+				if (manager == null) {
+					Debug.LogError("CustomMapUtility:AudioHandler: Map not initialized");
+					return;
+				}
+				manager.mapBgm = clips;
+			}
+			SingletonBehavior<BattleSoundManager>.Instance.SetEnemyTheme(clips);
+			if (immediate) {
+				SingletonBehavior<BattleSoundManager>.Instance.ChangeEnemyTheme(0);
+			}
+		}
+		/// <summary>
+		/// Sets the specified map's mapBgm using a loaded AudioClip array.
+		/// If mapName is null, changes Sephirah's mapBgm instead.
+		/// Also sets EnemyTheme to be sure.
+		/// </summary>
+		/// <param name="bgmNames">The name of the audio file (including extension).</param>
+		/// <param name="immediate">Whether it immediately forces the music to change</param>
+		/// <param name="mapName">The name of the target map</param>
+		public static void StartMapBgm(string[] bgmNames, bool immediate = true, string mapName = null) {
+			var clips = GetAudioClip(bgmNames);
 			MapManager manager;
 			if (mapName == null) {
 				Debug.LogWarning("CustomMapUtility:AudioHandler: Setting sephirah map's BGM");

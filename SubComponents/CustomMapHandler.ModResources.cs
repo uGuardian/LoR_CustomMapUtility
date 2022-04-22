@@ -24,16 +24,16 @@ namespace CustomMapUtility {
 			public class CacheInit : ModInitializer {
 				#if !PRERELEASE
 					#if !NOMP3
-						public const string version = "2.4.0";
+						public const string version = "2.5.0";
 					#else
-						public const string version = "2.4.0-NOMP3";
+						public const string version = "2.5.0-NOMP3";
 					#endif
 				#else
 					#warning PRERELEASE
 					#if !NOMP3
-						public const string version = "PRERELEASE-BGM_Arrays";
+						public const string version = "2.5.0-PRERELEASE";
 					#else
-						public const string version = "PRERELEASE-BGM_Arrays-NOMP3";
+						public const string version = "2.5.0-PRERELEASE-NOMP3";
 					#endif
 				#endif
 				public override void OnInitializeMod()

@@ -24,12 +24,6 @@ namespace CustomMapUtility {
 	}
 	#pragma warning restore IDE0051,IDE0059,CS0219,IDE1006
 	public partial class CustomMapHandler {
-		#region OBSOLETESTRINGS
-		public const string obsoleteString = "Remove (new MapManager) and change to InitCustomMap<MapManager>";
-		public const string obsoleteString2 = "Using InitCustomMap<MapManager> and removing typeof(MapManager) is new preferred";
-		public const string obsoleteStringGeneric = "Remove (new MapManager) and change to <MapManager> generic method";
-		public const string obsoleteStringGeneric2 = "Using <MapManager> generic method and removing typeof(MapManager) is new preferred";
-		#endregion
 
 		#pragma warning disable IDE0051,IDE0059,CS0219,IDE1006
 		sealed class A_ReadMe : CustomMapUtility.A_ReadMe {

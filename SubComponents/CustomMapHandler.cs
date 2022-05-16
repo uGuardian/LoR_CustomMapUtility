@@ -15,24 +15,13 @@ using NAudio.Wave;
 using Mod;
 #pragma warning disable MA0048, MA0016, MA0051
 
-namespace CustomMapUtility
-{
+namespace CustomMapUtility {
 	/// <summary>
 	/// Contains all CustomMapUtility commands.
 	/// </summary>
 	public partial class CustomMapHandler {
 		#pragma warning restore IDE0051,IDE0059,CS0219,IDE1006
 		#region HANDLER
-		/// <inheritdoc cref="InitCustomMap(string)"/>
-		[Obsolete(obsoleteString2)]
-		public static MapManager InitCustomMap(string stageName, Type managerType) {
-			bool initBGMs = true;
-			if (mapOffsetsCache.TryGetValue(stageName, out Offsets offsets)) {
-				initBGMs = mapAutoBgmCache[stageName];
-				Debug.Log("CustomMapUtility: Loaded offsets from cache");
-			} else {offsets = new Offsets(0.5f, 0.5f);}
-			return new CustomMapHandler().Init(stageName, managerType, offsets, isEgo: false, initBGMs);
-		}
 		/// <summary>
 		/// Initializes a custom map.
 		/// </summary>
@@ -60,18 +49,6 @@ namespace CustomMapUtility
 			return new CustomMapHandler().Init(stageName, typeof(T), offsets, isEgo: false, initBGMs);
 		}
 		/// <inheritdoc cref="InitCustomMap(string)"/>
-		[Obsolete(obsoleteString2)]
-		public static MapManager InitCustomMap(string stageName, Type managerType,
-			bool isEgo = false) {
-				bool initBGMs = true;
-				if (mapOffsetsCache.TryGetValue(stageName, out Offsets offsets)) {
-					initBGMs = mapAutoBgmCache[stageName];
-					Debug.Log("CustomMapUtility: Loaded offsets from cache");
-				}
-				else {offsets = new Offsets(0.5f, 0.5f);}
-				return new CustomMapHandler().Init(stageName, managerType, offsets, isEgo, initBGMs);
-		}
-		/// <inheritdoc cref="InitCustomMap(string)"/>
 		public static MapManager InitCustomMap<T>(string stageName,
 			bool isEgo = false) where T : MapManager, IBGM, new() {
 				bool initBGMs = true;
@@ -81,17 +58,6 @@ namespace CustomMapUtility
 				}
 				else {offsets = new Offsets(0.5f, 0.5f);}
 				return new CustomMapHandler().Init(stageName, typeof(T), offsets, isEgo, initBGMs);
-		}
-		/// <inheritdoc cref="InitCustomMap(string)"/>
-		[Obsolete(obsoleteString2)]
-		public static MapManager InitCustomMap(string stageName, Type managerType,
-			bool isEgo = false, bool initBGMs = true) {
-				if (mapOffsetsCache.TryGetValue(stageName, out Offsets offsets))
-				{
-					Debug.Log("CustomMapUtility: Loaded offsets from cache");
-				}
-				else { offsets = new Offsets(0.5f, 0.5f); }
-				return new CustomMapHandler().Init(stageName, managerType, offsets, isEgo, initBGMs);
 		}
 		/// <inheritdoc cref="InitCustomMap(string)"/>
 		public static MapManager InitCustomMap<T>(string stageName,
@@ -104,17 +70,6 @@ namespace CustomMapUtility
 				return new CustomMapHandler().Init(stageName, typeof(T), offsets, isEgo, initBGMs);
 		}
 		/// <inheritdoc cref="InitCustomMap(string)"/>
-		[Obsolete(obsoleteString2)]
-		public static MapManager InitCustomMap(string stageName, Type managerType,
-			float bgx = 0.5f, float bgy = 0.5f,
-			float floorx = 0.5f, float floory = (407.5f/1080f),
-			float underx = 0.5f, float undery = (300f/1080f)) {
-				if (mapAutoBgmCache.TryGetValue(stageName, out bool initBGMs)) { }
-				else {initBGMs = true;}
-				var offsets = new Offsets(bgx, bgy, floorx, floory, underx, undery);
-				return new CustomMapHandler().Init(stageName, managerType, offsets, isEgo: false, initBGMs);
-		}
-		/// <inheritdoc cref="InitCustomMap(string)"/>
 		public static MapManager InitCustomMap<T>(string stageName,
 			float bgx = 0.5f, float bgy = 0.5f,
 			float floorx = 0.5f, float floory = (407.5f/1080f),
@@ -125,18 +80,6 @@ namespace CustomMapUtility
 				return new CustomMapHandler().Init(stageName, typeof(T), offsets, isEgo: false, initBGMs);
 		}
 		/// <inheritdoc cref="InitCustomMap(string)"/>
-		[Obsolete(obsoleteString2)]
-		public static MapManager InitCustomMap(string stageName, Type managerType,
-			bool isEgo = false,
-			float bgx = 0.5f, float bgy = 0.5f,
-			float floorx = 0.5f, float floory = (407.5f/1080f),
-			float underx = 0.5f, float undery = (300f/1080f)) {
-				if (mapAutoBgmCache.TryGetValue(stageName, out bool initBGMs)) { }
-				else {initBGMs = true;}
-				var offsets = new Offsets(bgx, bgy, floorx, floory, underx, undery);
-				return new CustomMapHandler().Init(stageName, managerType, offsets, isEgo, initBGMs);
-		}
-		/// <inheritdoc cref="InitCustomMap(string)"/>
 		public static MapManager InitCustomMap<T>(string stageName,
 			bool isEgo = false,
 			float bgx = 0.5f, float bgy = 0.5f,
@@ -148,16 +91,6 @@ namespace CustomMapUtility
 				return new CustomMapHandler().Init(stageName, typeof(T), offsets, isEgo, initBGMs);
 		}
 		/// <inheritdoc cref="InitCustomMap(string)"/>
-		[Obsolete(obsoleteString2)]
-		public static MapManager InitCustomMap(string stageName, Type managerType,
-			bool isEgo = false, bool initBGMs = true,
-			float bgx = 0.5f, float bgy = 0.5f,
-			float floorx = 0.5f, float floory = (407.5f/1080f),
-			float underx = 0.5f, float undery = (300f/1080f)) {
-				var offsets = new Offsets(bgx, bgy, floorx, floory, underx, undery);
-				return new CustomMapHandler().Init(stageName, managerType, offsets, isEgo, initBGMs);
-		}
-		/// <inheritdoc cref="InitCustomMap(string)"/>
 		public static MapManager InitCustomMap<T>(string stageName,
 			bool isEgo = false, bool initBGMs = true,
 			float bgx = 0.5f, float bgy = 0.5f,
@@ -165,14 +98,6 @@ namespace CustomMapUtility
 			float underx = 0.5f, float undery = (300f/1080f)) where T : MapManager, IBGM, new() {
 				var offsets = new Offsets(bgx, bgy, floorx, floory, underx, undery);
 				return new CustomMapHandler().Init(stageName, typeof(T), offsets, isEgo, initBGMs);
-		}
-		/// <inheritdoc cref="InitCustomMap(string)"/>
-		[Obsolete(obsoleteString2)]
-		public static MapManager InitCustomMap(string stageName, Type managerType,
-			Offsets offsets) {
-				if (mapAutoBgmCache.TryGetValue(stageName, out bool initBGMs)) { }
-				else {initBGMs = true;}
-				return new CustomMapHandler().Init(stageName, managerType, offsets, isEgo: false, initBGMs);
 		}
 		/// <inheritdoc cref="InitCustomMap(string)"/>
 		public static MapManager InitCustomMap<T>(string stageName,
@@ -182,15 +107,6 @@ namespace CustomMapUtility
 				return new CustomMapHandler().Init(stageName, typeof(T), offsets, isEgo: false, initBGMs);
 		}
 		/// <inheritdoc cref="InitCustomMap(string)"/>
-		[Obsolete(obsoleteString2)]
-		public static MapManager InitCustomMap(string stageName, Type managerType,
-			Offsets offsets,
-			bool isEgo = false) {
-				if (mapAutoBgmCache.TryGetValue(stageName, out bool initBGMs)) { }
-				else {initBGMs = true;}
-				return new CustomMapHandler().Init(stageName, managerType, offsets, isEgo, initBGMs);
-		}
-		/// <inheritdoc cref="InitCustomMap(string)"/>
 		public static MapManager InitCustomMap<T>(string stageName,
 			Offsets offsets,
 			bool isEgo = false) where T : MapManager, IBGM, new() {
@@ -199,58 +115,11 @@ namespace CustomMapUtility
 				return new CustomMapHandler().Init(stageName, typeof(T), offsets, isEgo, initBGMs);
 		}
 		/// <inheritdoc cref="InitCustomMap(string)"/>
-		[Obsolete(obsoleteString2)]
-		public static MapManager InitCustomMap(string stageName, Type managerType,
-			Offsets offsets,
-			bool isEgo = false, bool initBGMs = true) {
-				return new CustomMapHandler().Init(stageName, managerType, offsets, isEgo, initBGMs);
-		}
-		/// <inheritdoc cref="InitCustomMap(string)"/>
 		public static MapManager InitCustomMap<T>(string stageName,
 			Offsets offsets,
 			bool isEgo = false, bool initBGMs = true) where T : MapManager, IBGM, new() {
 				return new CustomMapHandler().Init(stageName, typeof(T), offsets, isEgo, initBGMs);
 		}
-		/// <inheritdoc cref="InitCustomMap(string)"/>
-		[Obsolete(obsoleteString, true)]
-		public static void InitCustomMap(string stageName, MapManager manager) {}
-		/// <inheritdoc cref="InitCustomMap(string)"/>
-		[Obsolete(obsoleteString, true)]
-		public static void InitCustomMap(string stageName, MapManager manager,
-			bool isEgo = false) {}
-		/// <inheritdoc cref="InitCustomMap(string)"/>
-		[Obsolete(obsoleteString, true)]
-		public static void InitCustomMap(string stageName, MapManager manager,
-			bool isEgo = false, bool initBGMs = true) {}
-		/// <inheritdoc cref="InitCustomMap(string)"/>
-		[Obsolete(obsoleteString, true)]
-		public static void InitCustomMap(string stageName, MapManager manager,
-			float bgx = 0.5f, float bgy = 0.5f,
-			float floorx = 0.5f, float floory = (407.5f/1080f),
-			float underx = 0.5f, float undery = (300f/1080f)) {}
-		/// <inheritdoc cref="InitCustomMap(string)"/>
-		[Obsolete(obsoleteString, true)]
-		public static void InitCustomMap(string stageName, MapManager manager,
-			bool isEgo = false,
-			float bgx = 0.5f, float bgy = 0.5f,
-			float floorx = 0.5f, float floory = (407.5f/1080f),
-			float underx = 0.5f, float undery = (300f/1080f)) {}
-		/// <inheritdoc cref="InitCustomMap(string)"/>
-		[Obsolete(obsoleteString, true)]
-		public static void InitCustomMap(string stageName, MapManager manager,
-			bool isEgo = false, bool initBGMs = true,
-			float bgx = 0.5f, float bgy = 0.5f,
-			float floorx = 0.5f, float floory = (407.5f/1080f),
-			float underx = 0.5f, float undery = (300f/1080f)) {}
-		/// <inheritdoc cref="InitCustomMap(string)"/>
-		[Obsolete(obsoleteString, true)]
-		public static void InitCustomMap(string stageName, MapManager manager,
-			Offsets offsets) {}
-		/// <inheritdoc cref="InitCustomMap(string)"/>
-		[Obsolete(obsoleteString, true)]
-		public static void InitCustomMap(string stageName, MapManager manager,
-			Offsets offsets,
-			bool isEgo = false, bool initBGMs = true) {}
 
 		protected MapManager Init(string stageName, Type managerType, Offsets offsets, bool isEgo, bool initBGMs) {
 			// Debug.LogWarning("CustomMapUtility: StageController.InitializeMap throwing a NullReferenceException on stage start is expected, you can freely ignore it");

@@ -1,4 +1,6 @@
+#if DEBUG
 #define PRERELEASE
+#endif
 
 using System;
 using System.IO;
@@ -36,9 +38,9 @@ namespace CustomMapUtility {
 						public const string version = "2.5.0-PRERELEASE-NOMP3";
 					#endif
 				#endif
-				public override void OnInitializeMod()
-				{
+				public override void OnInitializeMod() {
 					var assembly = Assembly.GetExecutingAssembly();
+					/*
 					if (!string.Equals(assembly.GetName().Name, "ConfigAPI", StringComparison.Ordinal)) {
 						var curDir = new DirectoryInfo(assembly.Location + "\\..\\..");
 						Debug.Log($"CustomMapUtility Version \"{version}\" in Local Mode at {curDir.FullName}");
@@ -50,6 +52,8 @@ namespace CustomMapUtility {
 							select modInfo.dirInfo;
 						Debug.Log($"CustomMapUtility Version \"{version}\" in Global Mode");
 					}
+					*/
+					
 					_stagePaths = GetStageRootPaths();
 					_bgms = GetStageBgmInfos();
 					if (_stagePaths != null && _stagePaths.Count != 0) {

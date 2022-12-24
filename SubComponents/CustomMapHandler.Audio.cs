@@ -406,20 +406,59 @@ namespace CustomMapUtility
 		/// </summary>
 		/// <param name="enemy">Whether this is operating on EnemyTheme or AllyTheme</param>
 		public static void AntiEardrumDamage(bool enemy = true) {
+			var instance = SingletonBehavior<BattleSoundManager>.Instance;
+			var antiEardrumDamageClip = AudioClip.Create("AntiEardrumDamage", 1, 1, 1000, stream: false);
+			var antiEardrumDamageClipArray = new AudioClip[] {
+				antiEardrumDamageClip,
+			};
 			if (enemy) {
-				SingletonBehavior<BattleSoundManager>.Instance.SetEnemyTheme(new AudioClip[] {
-					AudioClip.Create("AntiEardrumDamage", 1, 1, 1000, stream: false),
-				});
-				SingletonBehavior<BattleSoundManager>.Instance.ChangeEnemyTheme(0);
+				instance.SetEnemyTheme(antiEardrumDamageClipArray);
+				instance.ChangeEnemyTheme(0);
 			} else {
-				SingletonBehavior<BattleSoundManager>.Instance.SetAllyTheme(new AudioClip[] {
-					AudioClip.Create("AntiEardrumDamage", 1, 1, 1000, stream: false),
-				});
-				SingletonBehavior<BattleSoundManager>.Instance.ChangeAllyTheme(0);
+				var curMap = SingletonBehavior<BattleSceneRoot>.Instance.currentMapObject;
+				var mapBgm = curMap.mapBgm;
+				curMap.mapBgm = antiEardrumDamageClipArray;
+				// instance.SetAllyTheme(antiEardrumDamageClipArray);
+				instance.ChangeAllyTheme(0);
+				curMap.mapBgm = mapBgm;
 			}
 			#if DEBUG
 			Debug.Log($"CustomMapUtility: Don't break my eardrums please; Called AntiEardrumDamage({enemy})");
 			#endif
+		}
+		public static void AntiEardrumDamage_Checked(bool enemy, params AudioClip[] clips) {
+			var instance = SingletonBehavior<BattleSoundManager>.Instance;
+			AudioSource checkedTheme;
+			if (enemy) {
+				checkedTheme = instance._currentEnemyTheme;
+			} else {
+				checkedTheme = instance._currentAllyTheme;
+			}
+			var currentTheme = instance.CurrentPlayingTheme;
+			if (currentTheme == checkedTheme && clips[GetCurrentEmotionIndex(clips)] == currentTheme.clip) {return;}
+			AntiEardrumDamage(enemy);
+		}
+		public static int GetCurrentEmotionIndex(params AudioClip[] clips) => GetCurrentEmotionIndex(clips.Length - 1);
+		public static int GetCurrentEmotionIndex(int maxIndex) {
+			int emotionLevel = Singleton<StageController>.Instance.GetCurrentStageFloorModel().team.emotionLevel;
+			int idx = 0;
+			switch (emotionLevel)
+			{
+			case 0:
+			case 1:
+				idx = 0;
+				break;
+			case 2:
+			case 3:
+				idx = 1;
+				break;
+			case 4:
+			case 5:
+				idx = 2;
+				break;
+			}
+			idx = Mathf.Clamp(idx, 0, maxIndex);
+			return idx;
 		}
 		#endregion
 	}

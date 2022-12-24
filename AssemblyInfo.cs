@@ -15,6 +15,3 @@ using CustomMapUtility;
 [assembly: System.Reflection.AssemblyProductAttribute("CustomMapUtility")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CustomMapUtility")]
 [assembly: System.Reflection.AssemblyVersionAttribute(CustomMapHandler.ModResources.CacheInit.version)]
-#pragma warning disable CS0618
-[assembly: SecurityPermission(SecurityAction.RequestMinimum, SkipVerification = true)]
-#pragma warning restore CS0618

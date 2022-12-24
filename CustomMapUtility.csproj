@@ -1,9 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
 	<PlatformTarget>AnyCPU</PlatformTarget>
-	<TargetFramework>net48</TargetFramework>
+	<TargetFramework>net472</TargetFramework>
 	<DebugType>pdbonly</DebugType>
-	<Optimize>true</Optimize>
 	<SignAssembly>true</SignAssembly>
 	<AssemblyOriginatorKeyFile>..\uGuardian_LoR.snk</AssemblyOriginatorKeyFile>
 	<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
@@ -20,6 +19,7 @@
 	</Reference>
 	<Reference Include="Assembly-CSharp">
 	  <HintPath>..\libs\Managed\Assembly-CSharp.dll</HintPath>
+	  <HintPath>..\libs\Assembly-CSharp-nstrip.dll</HintPath>
 	</Reference>
 	<Reference Include="Coffee.SoftMaskForUGUI">
 	  <HintPath>..\libs\Managed\Coffee.SoftMaskForUGUI.dll</HintPath>
@@ -348,16 +348,20 @@
 	<Reference Include="UnityEngine.XRModule">
 	  <HintPath>..\libs\Managed\UnityEngine.XRModule.dll</HintPath>
 	</Reference>
-	<Compile Remove="Template.cs"/>
-	<Compile Remove="AdvTemplate.cs"/>
-	<Compile Remove="Assemblies\Wav_Old.cs"/>
+	<Compile Remove="Template.cs" />
+	<Compile Remove="AdvTemplate.cs" />
+	<Compile Remove="Assemblies\Wav_Old.cs" />
+	<Compile Remove="Collections.cs" />
   </ItemGroup>
   <ItemGroup>
-	<Compile Remove="..\CustomMapUtility\Assemblies\*"/>
-	<Compile Remove="Assemblies\Wav_Old.cs"/>
-	<PackageReference Include="Microsoft.CodeAnalysis" Version="4.0.0"/>
-	<PackageReference Include="Meziantou.Analyzer" Version="*"/>
-	<PackageReference Include="Microsoft.CodeDom.Providers.DotNetCompilerPlatform" Version="*"/>
-	<PackageReference Include="NAudio" Version="1.8.5"/>
+	<Compile Remove="..\CustomMapUtility\Assemblies\*" />
+	<Compile Remove="Assemblies\Wav_Old.cs" />
+	<!--PackageReference Include="Microsoft.CodeAnalysis" Version="4.0.0" /-->
+	<!--PackageReference Include="Meziantou.Analyzer" Version="*" /-->
+	<!--PackageReference Include="Microsoft.CodeDom.Providers.DotNetCompilerPlatform" Version="*" /-->
+	<PackageReference Include="NAudio" Version="1.8.5" />
+  </ItemGroup>
+  <ItemGroup>
+	<Content Include="BlankStage.bundle" />
   </ItemGroup>
 </Project>

@@ -13,10 +13,12 @@ using System.Linq;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.Networking;
+using System.Text;
 #if !NOMP3
 using NAudio.Wave;
 #endif
 using Mod;
+using System.Xml.Serialization;
 #pragma warning disable MA0048, MA0016, MA0051
 
 namespace CustomMapUtility {
@@ -24,36 +26,48 @@ namespace CustomMapUtility {
 		#region RESOURCES
 		public static class ModResources {
 			public class CacheInit : ModInitializer {
-				#if !PRERELEASE
-					#if !NOMP3
-						public const string version = "2.5.0";
-					#else
-						public const string version = "2.5.0-NOMP3";
-					#endif
-				#else
+				public const string version = "3.0.0";
+				#if PRERELEASE
 					#warning PRERELEASE
-					#if !NOMP3
-						public const string version = "2.5.0-PRERELEASE";
-					#else
-						public const string version = "2.5.0-PRERELEASE-NOMP3";
-					#endif
+					public const string feature = "OVERHAUL";
 				#endif
+				static bool initialized = false;
 				public override void OnInitializeMod() {
-					var assembly = Assembly.GetExecutingAssembly();
+					if (initialized) {return;}
+					#if !PRERELEASE
+					Debug.Log($"CustomMapUtility Version \"{version}\"");
+					#else
+					Debug.Log($"CustomMapUtility Version \"{version}-PRERELEASE\" with feature \"{feature}\"");
+					#endif
+					var assemblyName = Assembly.GetExecutingAssembly().GetName().Name;
+					var assemblyToken = Assembly.GetExecutingAssembly().GetName().GetPublicKeyToken();
+					var step1 = AppDomain.CurrentDomain.GetAssemblies()
+						.AsParallel();
+					var step2 = step1.Where(a => {
+							var refAssemblies = a.GetReferencedAssemblies();
+							return Array.Exists(refAssemblies, x =>
+								string.Equals(assemblyName, x.Name, StringComparison.Ordinal) && assemblyToken.SequenceEqual(x.GetPublicKeyToken()));
+						});
+					var step3 = step2.Select(GetIdAndDirFromXml);
+					step3.ForAll(x => {
+					// foreach (var x in step5) {
+						var (uniqueId, dirInfo) = x;
+
+						var container = new CMUContainer(uniqueId, dirInfo);
+
+						if(!containerDic.TryAdd(uniqueId, container)) {
+							var oldContainer = containerDic[uniqueId];
+							if (!oldContainer.ConfirmSameDirectory(container)) {
+								// If this occurs it will attempt to compensate, but may error.
+								AddErrorLog($"CustomMapUtility: ModID {uniqueId} exists in multiple directories");
+							}
+							// This shouldn't happen, but just to be sure this exists as a backup.
+							lock (oldContainer) {
+								oldContainer.CopyFrom(container);
+							}
+						}
+					});
 					/*
-					if (!string.Equals(assembly.GetName().Name, "ConfigAPI", StringComparison.Ordinal)) {
-						var curDir = new DirectoryInfo(assembly.Location + "\\..\\..");
-						Debug.Log($"CustomMapUtility Version \"{version}\" in Local Mode at {curDir.FullName}");
-						_dirInfos = new DirectoryInfo[] { curDir };
-					} else {
-						_dirInfos =
-							from modInfo in ModContentInfoLoader.LoadAllModInfos()
-								// where modInfo.activated == true
-							select modInfo.dirInfo;
-						Debug.Log($"CustomMapUtility Version \"{version}\" in Global Mode");
-					}
-					*/
-					
 					_stagePaths = GetStageRootPaths();
 					_bgms = GetStageBgmInfos();
 					if (_stagePaths != null && _stagePaths.Count != 0) {
@@ -72,106 +86,143 @@ namespace CustomMapUtility {
 						bgmsDebug += Environment.NewLine+"}";
 						Debug.Log(bgmsDebug);
 					}
-					#if !NOMP3
-					Singleton<ModContentManager>.Instance.GetErrorLogs().RemoveAll(x => x.Contains("NAudio"));
-					#endif
+					*/
+					StringBuilder sb = new StringBuilder("CustomMapUtility: Mods using this version: {");
+					sb.AppendLine();
+					foreach (var modId in containerDic.Keys) {
+						sb.Append("	");
+						sb.AppendLine(modId);
+					}
+					sb.Append("}");
+					Debug.Log(sb);
+					initialized = true;
 				}
 			}
-			public static string GetStagePath(string stageName) {
-				IEnumerable<DirectoryInfo> stagePaths =
-					from info in GetStageRootPaths()
-					where string.Equals(info.Name, stageName, StringComparison.Ordinal)
-					select info;
-				string path = null;
-				foreach (var dir in stagePaths) {
-					if (path == null) {
-						path = dir.FullName;
+			public static (string uniqueId, DirectoryInfo dirInfo) GetIdAndDirFromXml(Assembly assembly) {
+				DirectoryInfo dirInfo = new FileInfo(assembly.Location).Directory.Parent;
+				var files = dirInfo.EnumerateFiles("StageModInfo.xml");
+				FileInfo stageModInfo;
+				while ((stageModInfo = files.FirstOrDefault()) == null) {
+					dirInfo = dirInfo.Parent;
+					files = dirInfo.EnumerateFiles("StageModInfo.xml");
+				}
+				using (var streamReader = stageModInfo.OpenRead()) {
+					Workshop.NormalInvitation invInfo = (Workshop.NormalInvitation) new XmlSerializer(typeof(Workshop.NormalInvitation)).Deserialize(streamReader);
+					if (string.IsNullOrEmpty(invInfo.workshopInfo.uniqueId) || string.Equals(invInfo.workshopInfo.uniqueId, "-1", StringComparison.Ordinal)) {
+						invInfo.workshopInfo.uniqueId = dirInfo.Name;
+					}
+					string uniqueId = invInfo.workshopInfo.uniqueId;
+					return (uniqueId, dirInfo);
+				}
+			}
+			internal static readonly ConcurrentDictionary<string, CMUContainer> containerDic = new ConcurrentDictionary<string, CMUContainer>();
+			public class CMUContainer : IEquatable<CMUContainer>, IEquatable<string> {
+				public readonly string uniqueId;
+				public readonly DirectoryInfo directory;
+				public readonly DirectoryInfo resourceDir;
+				public readonly DirectoryInfo stageRootDir;
+				public readonly Dictionary<string, DirectoryInfo> stageDic;
+				public readonly DirectoryInfo audioRootDir;
+				public readonly Dictionary<string, FileInfo> audioDic;
+
+				public CMUContainer(string uniqueId, DirectoryInfo directory) {
+					this.uniqueId = uniqueId;
+					this.directory = directory;
+
+					this.resourceDir = directory.EnumerateDirectories("Resource").FirstOrDefault();
+					if (resourceDir == null) {return;}
+					var resourceDirs = resourceDir.GetDirectories();
+					this.stageRootDir = resourceDirs.FirstOrDefault(x => string.Equals(x.Name, "Stage", StringComparison.OrdinalIgnoreCase));
+					this.audioRootDir = resourceDirs.FirstOrDefault(x => string.Equals(x.Name, "CustomAudio", StringComparison.OrdinalIgnoreCase));
+					this.stageDic = stageRootDir?.EnumerateDirectories()
+						.ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase) ??
+						new Dictionary<string, DirectoryInfo>(StringComparer.OrdinalIgnoreCase);
+					this.audioDic = audioRootDir?.EnumerateFiles("*", SearchOption.AllDirectories)
+						.ToDictionary(b => b.Name, StringComparer.OrdinalIgnoreCase) ??
+						new Dictionary<string, FileInfo>(StringComparer.OrdinalIgnoreCase);
+				}
+
+				public bool Equals(CMUContainer target) {
+					if (target == null) {
+						return false;
+					}
+					return string.Equals(uniqueId, target.uniqueId, StringComparison.Ordinal);
+				}
+				public bool Equals(string target) {
+					if (target == null) {
+						return false;
+					}
+					return string.Equals(uniqueId, target, StringComparison.Ordinal);
+				}
+				public override bool Equals(object obj) {
+					if (obj == null || !GetType().Equals(obj.GetType())) {
+						return false;
+					}
+					var target = (CMUContainer)obj;
+					return string.Equals(uniqueId, target.uniqueId, StringComparison.Ordinal);
+				}
+				public static bool operator ==(CMUContainer a, CMUContainer b) => a.Equals(b);
+				public static bool operator !=(CMUContainer a, CMUContainer b) => !a.Equals(b);
+				public static explicit operator string(CMUContainer a) => a.uniqueId;
+
+				public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(uniqueId);
+
+				public override string ToString() => uniqueId;
+
+				[Obsolete("Use GetStageDir instead")]
+				public string GetStagePath(string stageName) {
+					if (!stageDic.TryGetValue(stageName, out var dir) && dir == null) {
+						throw new ArgumentNullException(nameof(stageName), "Stage does not exist");
+					}
+					var path = dir.FullName;
+					Debug.Log($"CustomMapUtility: StagePath: {path}");
+					return path;
+				}
+				public DirectoryInfo GetStageDir(string stageName) {
+					if (!stageDic.TryGetValue(stageName, out var dir) && dir == null) {
+						throw new ArgumentNullException(nameof(stageName), "Stage does not exist");
+					}
+					Debug.Log($"CustomMapUtility: StagePath: {dir.FullName}");
+					return dir;
+				}
+				public FileInfo GetStageBgmInfo(string bgmName) {
+					if (audioDic.TryGetValue(bgmName, out var file)) {
+						return file;
 					} else {
-						Debug.LogError($"Multiple stages share the name \"{stageName}\"");
+						return null;
 					}
 				}
-				if (path == null) {
-					throw new ArgumentNullException(nameof(stageName), "Stage does not exist");
-				}
-				Debug.Log("CustomMapUtility: StagePath: "+path);
-				return path;
-			}
-			[Obsolete("Use GetStageBgmInfos() instead")]
-			public static string[] GetStageBgmPaths() {
-				string[] bgms = new string[_bgms.Count];
-				int i = 0;
-				foreach (var bgm in _bgms) {
-					bgms[i] = bgm.FullName;
-					i++;
-				}
-				return bgms;
-			}
-			private static List<FileInfo> _bgms;
-			[Obsolete("Use GetStageBgmInfos(string[]) instead")]
-			public static string[] GetStageBgmPaths(string[] bgmNames) {
-				int debugCount = 0;
-				foreach (var bgm in bgmNames) {
-					Debug.Log($"CustomMapUtility: BGM{debugCount}: {bgm}{Environment.NewLine}");
-					debugCount++;
-				}
-				IEnumerable<string> bgms =
-					from file in GetStageBgmInfos()
-					where bgmNames.Any(b => string.Equals(b, file.Name, StringComparison.OrdinalIgnoreCase))
-					select file.FullName;
-				return bgms.ToArray();
-			}
-			public static List<FileInfo> GetStageBgmInfos() {
-				if (_bgms != null && _bgms.Count != 0) {
-					return _bgms;
-				}
-				List<FileInfo> bgms = new List<FileInfo>();
-				foreach (DirectoryInfo dir in _dirInfos) {
-					DirectoryInfo bgmsPath = new DirectoryInfo(Path.Combine(dir.FullName, "Resource/CustomAudio"));
-					if (bgmsPath.Exists) {
-						bgms.AddRange(bgmsPath.GetFiles());
+				public Dictionary<string, FileInfo> GetStageBgmInfos(IEnumerable<string> bgmNames) {
+					var bgms = new Dictionary<string, FileInfo>(StringComparer.OrdinalIgnoreCase);
+					foreach (var name in bgmNames) {
+						if (audioDic.TryGetValue(name, out var file)) {
+							bgms.Add(name, file);
+						}
 					}
-					bgmsPath = new DirectoryInfo(Path.Combine(dir.FullName, "Resource/StageBgm"));
-					if (bgmsPath.Exists) {
-						Debug.LogWarning("CustomMapUtility: StageBgm folder is now obsolete, please use CustomAudio folder instead.");
-						Singleton<ModContentManager>.Instance.GetErrorLogs().Add($"<color=yellow>(assembly: {Assembly.GetExecutingAssembly().GetName().Name}) CustomMapUtility: StageBgm folder is now obselete, please use CustomAudio folder instead.</color>");
-						bgms.AddRange(bgmsPath.GetFiles());
+					return bgms;
+				}
+				public Dictionary<string, FileInfo> GetStageBgmInfos(params string[] bgmNames) =>
+					GetStageBgmInfos((IEnumerable<string>)bgmNames);
+
+				public void CopyFrom(CMUContainer other) {
+					foreach (var entry in other.stageDic) {
+						if (!stageDic.TryAdd(entry.Key, entry.Value)) {
+							if (!string.Equals(stageDic[entry.Key].FullName, entry.Value.FullName, StringComparison.Ordinal)) {
+								AddErrorLog($"CustomMapUtility: Conflict for stage {entry.Key} occured during container copy");
+							}
+						}
+					}
+					foreach (var entry in other.audioDic) {
+						if (!audioDic.TryAdd(entry.Key, entry.Value)) {
+							if (!string.Equals(stageDic[entry.Key].FullName, entry.Value.FullName, StringComparison.Ordinal)) {
+								AddErrorLog($"CustomMapUtility: Conflict for audio file {entry.Key} occured during container copy");
+							}
+						}
 					}
 				}
-				return bgms;
+				public bool ConfirmSameDirectory(CMUContainer other) => string.Equals(directory.FullName, other.directory.FullName);
 			}
-			public static Dictionary<string, FileInfo> GetStageBgmInfos(string[] bgmNames) {
-				IEnumerable<FileInfo> bgms =
-					from file in GetStageBgmInfos()
-					where bgmNames.Any(b => string.Equals(b, file.Name, StringComparison.OrdinalIgnoreCase))
-					select file;
-				return bgms.ToDictionary(b => b.Name, StringComparer.OrdinalIgnoreCase);
-			}
-			/// <summary>
-			/// A debug function that resets the stage bgm path cache
-			/// </summary>
-			[Obsolete("This is a debug function and should not be used in final production")]
-			public static void ResetStageBgmInfos() {
-				_bgms = null;
-			}
-			private static IEnumerable<DirectoryInfo> _dirInfos;
-			public static List<DirectoryInfo> GetStageRootPaths() {
-				if (_stagePaths != null && _stagePaths.Count != 0) {
-					return _stagePaths;
-				}
-				List<DirectoryInfo> paths = new List<DirectoryInfo>();
-				foreach (DirectoryInfo dir in _dirInfos) {
-					DirectoryInfo stagePath = new DirectoryInfo(Path.Combine(dir.FullName, "Resource/Stage"));
-					if (stagePath.Exists) {
-						paths.Add(stagePath);
-					}
-				}
-				List<DirectoryInfo> stagePaths = new List<DirectoryInfo>();
-				foreach (var path in paths) {
-					stagePaths.AddRange(path.GetDirectories());
-				}
-				return stagePaths;
-			}
-			private static List<DirectoryInfo> _stagePaths;
+			static void AddErrorLog(string msg) => Singleton<ModContentManager>.Instance.AddErrorLog(msg);
 		}
 		#endregion
 	}

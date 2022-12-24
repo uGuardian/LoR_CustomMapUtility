@@ -6,9 +6,9 @@ using System.Collections.Specialized;
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Linq;
-using System.Reflection;
 using UnityEngine;
 using UnityEngine.Networking;
+using System.Threading.Tasks;
 #if !NOMP3
 using NAudio.Wave;
 #endif
@@ -17,33 +17,40 @@ using Mod;
 
 namespace CustomMapUtility {
 	#region MAPMANAGERS
-	public interface IBGM {
+	public interface IBGM : ICMU {
 		string[] GetCustomBGMs();
 		bool AutoBGM {get; set;}
 	}
-	public class CustomMapManager : MapManager, IBGM {
+	public interface IAsyncMapInit {
+		event EventHandler FirstLoad;
+		bool FirstLoadCalled {get;}
+	}
+	public class CustomMapManager : MapManager, IBGM, IAsyncMapInit {
+		public CustomMapHandler Handler {get; set;}
 		public override void EnableMap(bool b) {
 			base.EnableMap(b);
 			SingletonBehavior<BattleCamManager>.Instance.BlurBackgroundCam(!b);
 			if (b) {
 				if (AutoBGM) {
-					mapBgm = SingletonBehavior<BattleSoundManager>.Instance.GetCurrentTheme(out bool isEnemy);
-					if (!isEnemy) {
-						Debug.LogWarning("CustomMapUtility: Use of AutoBGM on themes not included in EnemyThemes is not officially supported yet");
-					}
+					mapBgm = GetAutoBGM();
 				} else if (mapBgm == null) {
 					if (CustomBGMs != null) {
-						mapBgm = CustomMapHandler.GetAudioClip(CustomBGMs);
+						mapBgm = Handler.GetAudioClip(CustomBGMs);
 					}
 					if (mapBgm == null) {
 						Debug.LogError("CustomMapUtility: mapBgm was null when the map was enabled. Setting it to current theme.");
-						mapBgm = SingletonBehavior<BattleSoundManager>.Instance.GetCurrentTheme(out bool isEnemy);
-						if (!isEnemy) {
-							Debug.LogWarning("CustomMapUtility: Use of AutoBGM on themes not included in EnemyThemes is not officially supported yet");
-						}
+						mapBgm = GetAutoBGM();
 					}
 				}
 			}
+		}
+		public AudioClip[] GetAutoBGM() {
+			var battleSoundManager = SingletonBehavior<BattleSoundManager>.Instance;
+			var bgms = battleSoundManager.GetCurrentThemes(out bool isEnemy, out bool isEnemyDefault);
+			if (isEnemy && isEnemyDefault == true) {
+				bgms = battleSoundManager.GetAllyThemes();
+			}
+			return bgms;
 		}
 		public override GameObject GetScratch(int lv, Transform parent)
 		{
@@ -63,12 +70,19 @@ namespace CustomMapUtility {
 		}
 		public override void InitializeMap()
 		{
+			OnFirstLoad(EventArgs.Empty);
 			base.InitializeMap();
 			// This makes the map not have the sephirah filter
 			sephirahType = SephirahType.None;
 			sephirahColor = Color.black;
 		}
 		string[] IBGM.GetCustomBGMs() => CustomBGMs;
+
+		protected void OnFirstLoad(EventArgs e) {
+			FirstLoad?.Invoke(this, e);
+			firstLoadCalled = true;
+		}
+
 		/// <summary>
 		/// Override and specify a string array with audio file names (including extensions) for the get parameter.
 		/// </summary>
@@ -78,30 +92,36 @@ namespace CustomMapUtility {
 		protected internal virtual string[] CustomBGMs => null;
 		bool IBGM.AutoBGM {get => AutoBGM; set => AutoBGM = value;}
 		protected internal bool AutoBGM = false;
+		public event EventHandler FirstLoad;
+		bool IAsyncMapInit.FirstLoadCalled {get => firstLoadCalled;}
+		private bool firstLoadCalled;
 	}
-	public class CustomCreatureMapManager : CreatureMapManager, IBGM {
+	public class CustomCreatureMapManager : CreatureMapManager, IBGM, IAsyncMapInit {
+		public CustomMapHandler Handler {get; set;}
 		public override void EnableMap(bool b) {
 			base.EnableMap(b);
 			SingletonBehavior<BattleCamManager>.Instance.BlurBackgroundCam(!b);
 			if (b) {
 				if (AutoBGM) {
-					mapBgm = SingletonBehavior<BattleSoundManager>.Instance.GetCurrentTheme(out bool isEnemy);
-					if (!isEnemy) {
-						Debug.LogWarning("CustomMapUtility: Use of AutoBGM on themes not included in EnemyThemes is not officially supported yet");
-					}
+					mapBgm = GetAutoBGM();
 				} else if (mapBgm == null) {
 					if (CustomBGMs != null) {
-						mapBgm = CustomMapHandler.GetAudioClip(CustomBGMs);
+						mapBgm = Handler.GetAudioClip(CustomBGMs);
 					}
 					if (mapBgm == null) {
 						Debug.LogError("CustomMapUtility: mapBgm was null when the map was enabled. Setting it to current theme.");
-						mapBgm = SingletonBehavior<BattleSoundManager>.Instance.GetCurrentTheme(out bool isEnemy);
-						if (!isEnemy) {
-							Debug.LogWarning("CustomMapUtility: Use of AutoBGM on themes not included in EnemyThemes is not officially supported yet");
-						}
+						mapBgm = GetAutoBGM();
 					}
 				}
 			}
+		}
+		public AudioClip[] GetAutoBGM() {
+			var battleSoundManager = SingletonBehavior<BattleSoundManager>.Instance;
+			var bgms = battleSoundManager.GetCurrentThemes(out bool isEnemy, out bool isEnemyDefault);
+			if (isEnemy && isEnemyDefault == true) {
+				bgms = battleSoundManager.GetAllyThemes();
+			}
+			return bgms;
 		}
 		public override GameObject GetScratch(int lv, Transform parent)
 		{
@@ -121,6 +141,7 @@ namespace CustomMapUtility {
 		}
 		public override void InitializeMap()
 		{
+			OnFirstLoad(EventArgs.Empty);
 			base.InitializeMap();
 			// This makes the map not have the sephirah filter
 			sephirahType = SephirahType.None;
@@ -216,6 +237,14 @@ namespace CustomMapUtility {
 		/// This isn't reccomended to use by itself, it's better to override <c>CreateDialogShared()</c> for finer control
 		/// </remarks>
 		protected internal virtual bool AbnoTextForce => false;
+
+		protected void OnFirstLoad(EventArgs e) {
+			FirstLoad?.Invoke(this, e);
+			firstLoadCalled = true;
+		}
+		public event EventHandler FirstLoad;
+		bool IAsyncMapInit.FirstLoadCalled {get => firstLoadCalled;}
+		private bool firstLoadCalled;
 	}
 	#endregion
 }

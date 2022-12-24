@@ -6,7 +6,6 @@ using System.Collections.Specialized;
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Linq;
-using System.Reflection;
 using UnityEngine;
 using UnityEngine.Networking;
 #if !NOMP3
@@ -17,35 +16,66 @@ using Mod;
 
 namespace CustomMapUtility {
 	public partial class CustomMapHandler {
-		#region EXTENSIONS
-
-		/// <inheritdoc cref="CustomMapUtilityExtensions.ChangeToCustomEgoMap(BattleSceneRoot, string, Faction, Type, bool)"/>
-		public static void ChangeToCustomEgoMap<T>(string mapName, Faction faction = Faction.Player, bool byAssimilationFlag = false)
-			where T : MapManager, IBGM, new()
-			=> SingletonBehavior<BattleSceneRoot>.Instance.ChangeToCustomEgoMap<T>(mapName, faction, byAssimilationFlag);
-
-		/// <inheritdoc cref="CustomMapUtilityExtensions.AddCustomEgoMapByAssimilation(StageController, string, Faction, Type)"/>
-		public static void AddCustomEgoMapByAssimilation<T>(string name, Faction faction = Faction.Player)
-			where T : MapManager, IBGM, new()
-			=> Singleton<StageController>.Instance.AddCustomEgoMapByAssimilation<T>(name, faction);
-
-		/// <inheritdoc cref="CustomMapUtilityExtensions.AddCustomEgoMapByAssimilation(StageController, string, Faction, Type)"/>
-		public static void ChangeToCustomEgoMapByAssimilation<T>(string mapName, Faction faction = Faction.Player)
-			where T : MapManager, IBGM, new()
-			=> Singleton<StageController>.Instance.AddCustomEgoMapByAssimilation<T>(mapName, faction);
+		/// <summary>
+		/// Changes to a custom map while insuring it's initialized.
+		/// </summary>
+		/// <param name="mapName">The name of the target map</param>
+		/// <param name="playEffect">Determines what direction the transition special effect starts from, currently unsupported</param>
+		/// <param name="scaleChange">Whether units are rescaled to the new map size</param>
+		public bool ChangeToCustomMap<T>(string mapName, Faction? playEffect = Faction.Enemy, bool scaleChange = true)
+			where T : MapManager, ICMU, new()
+		{
+			var instance = SingletonBehavior<BattleSceneRoot>.Instance;
+			if (string.IsNullOrEmpty(mapName)) {
+				return false;
+			}
+			List<MapManager> addedMapList = instance._addedMapList;
+			bool exists = addedMapList?.Exists((MapManager x) => x.name.Contains(mapName)) ?? false;
+			if (!exists) {
+				#if DEBUG
+				Debug.LogWarning($"Reinitializing {mapName} with {typeof(T)}");
+				#endif
+				InitCustomMap<T>(mapName);
+			}
+			// TODO Implement custom map change.
+			// return instance.ChangeToSpecialMap(mapName, playEffect, scaleChange);
+			bool changed = instance.ChangeToSpecialMap(mapName, playEffect != null, scaleChange);
+			if (playEffect == null) {
+				DisableMapChangingEffect(instance._mapChangeFilter);
+			}
+			return changed;
+		}
+		static void DisableMapChangingEffect(MapChangeFilter instance) {
+			instance.enabled = false;
+			instance.enabled = true;
+			/*
+			SpriteRenderer renderer = instance.GetComponent<SpriteRenderer>();
+			_2dxFX_Ghost ghostEffect = instance.GetComponent<_2dxFX_Ghost>();
+			Vector3 src = Vector3.zero;
+			Vector3 dst = Vector3.zero;
+			Vector3 cur = src;
+			ParticleSystem component = instance._particleObj.GetComponent<ParticleSystem>();
+			ParticleSystem.EmissionModule em = component.emission;
+			renderer.enabled = false;
+			instance._bParticleArrived = true;
+			UnityEngine.Object.Destroy(ghostEffect);
+			src = default(Vector3);
+			dst = default(Vector3);
+			cur = default(Vector3);
+			em = default(ParticleSystem.EmissionModule);
+			*/
+		}
+		/// <inheritdoc cref="CustomMapUtilityExtensions.AddCustomEgoMapByAssimilation(string, Faction, Type)"/>
+		public void ChangeToCustomEgoMapByAssimilation<T>(string mapName, Faction faction = Faction.Player)
+			where T : MapManager, ICMU, new()
+			=> AddCustomEgoMapByAssimilation<T>(mapName, faction);
 
 		/// <summary>
 		/// Removes a synchonization map.
 		/// </summary>
 		/// <param name="name">The name of the target map</param>
-		public static void RemoveCustomEgoMapByAssimilation(string name) => Singleton<StageController>.Instance.RemoveEgoMapByAssimilation(name);
-		#endregion
-	}
-	#region EXTENSIONS
-	/// <summary>
-	///  Contains helper extensions for more natural use.
-	/// </summary>
-	public static class CustomMapUtilityExtensions {
+		public void RemoveCustomEgoMapByAssimilation(string name) => Singleton<StageController>.Instance.RemoveEgoMapByAssimilation(name);
+
 		/// <summary>
 		/// Changes to a custom EGO map.
 		/// </summary>
@@ -53,14 +83,15 @@ namespace CustomMapUtility {
 		/// <param name="faction">Determines what direction the transition special effect starts from</param>
 		/// <param name="manager">If not null, automatically reinitializes the map if it's been removed</param>
 		/// <param name="byAssimilationFlag">Should always be false, don't change this yourself</param>
-		public static void ChangeToCustomEgoMap<T>(this BattleSceneRoot Instance, string mapName, Faction faction = Faction.Player, bool byAssimilationFlag = false) where T : MapManager, IBGM, new() {
-			if (String.IsNullOrWhiteSpace(mapName))
+		public void ChangeToCustomEgoMap<T>(string mapName, Faction faction = Faction.Player, bool byAssimilationFlag = false) where T : MapManager, ICMU, new() {
+			var Instance = SingletonBehavior<BattleSceneRoot>.Instance;
+			if (String.IsNullOrEmpty(mapName))
 			{
 				Debug.LogError("CustomMapUtility: Ego map not specified");
 				return;
 			}
-			List<MapManager> addedMapList = Instance.GetType().GetField("_addedMapList", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(Instance) as List<MapManager>;
-			MapChangeFilter mapChangeFilter = Instance.GetType().GetField("_mapChangeFilter", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(Instance) as MapChangeFilter;
+			List<MapManager> addedMapList = Instance._addedMapList;
+			MapChangeFilter mapChangeFilter = Instance._mapChangeFilter;
 			MapManager x2 = addedMapList?.Find((MapManager x) => x.name.Contains(mapName));
 			if (x2 == null && typeof(T) == null) {
 				Debug.LogError("CustomMapUtility: Ego map not initialized");
@@ -69,7 +100,7 @@ namespace CustomMapUtility {
 			if (x2 == null)
 			{
 				Debug.LogWarning("CustomMapUtility: Reinitializing Ego map");
-				CustomMapHandler.InitCustomMap<T>(mapName, isEgo: true);
+				InitCustomMap<T>(mapName, isEgo: true);
 				x2 = addedMapList?.Find((MapManager x) => x.name.Contains(mapName));
 			}
 			mapChangeFilter.StartMapChangingEffect((Direction)faction, particleOn: true);
@@ -96,12 +127,6 @@ namespace CustomMapUtility {
 			return;
 		}
 		
-		/// <inheritdoc cref="AddCustomEgoMapByAssimilation(StageController, string, Faction, Type)"/>
-		
-		/// <inheritdoc cref="AddCustomEgoMapByAssimilation(StageController, string, Faction, Type)"/>
-		public static void ChangeToCustomEgoMapByAssimilation<T>(this BattleSceneRoot _, string mapName, Faction faction = Faction.Player) where T : MapManager, IBGM, new() 
-			=> Singleton<StageController>.Instance.AddCustomEgoMapByAssimilation<T>(mapName, faction);
-		
 		/// <summary>
 		/// Adds and Changes to a custom synchonization map.
 		/// </summary>
@@ -110,94 +135,106 @@ namespace CustomMapUtility {
 		/// <param name="faction">Determines what direction the transition special effect starts from</param>
 		/// <param name="managerType">If not null, automatically reinitializes the map if it's been removed</param>
 		/// <param name="byAssimilationFlag">Should always be false, don't change this yourself</param>
-		public static void AddCustomEgoMapByAssimilation<T>(this StageController Instance, string name, Faction faction = Faction.Player) where T : MapManager, IBGM, new() {
-			if (Singleton<StageController>.Instance.IsTwistedArgaliaBattleEnd())
-			{
+		public void AddCustomEgoMapByAssimilation<T>(string name, Faction faction = Faction.Player) where T : MapManager, ICMU, new() {
+			var Instance = StageController.Instance;
+			if (Singleton<StageController>.Instance.IsTwistedArgaliaBattleEnd()) {
 				return;
 			}
-			var addedEgoMapOrigin = Instance.GetType().GetField("_addedEgoMap", BindingFlags.NonPublic | BindingFlags.Instance);
-			List<string> addedEgoMap = addedEgoMapOrigin.GetValue(Instance) as List<string>;
-			addedEgoMap.Add(name);
-			addedEgoMapOrigin.SetValue(Instance, addedEgoMap);
-			if (name != null && name != string.Empty)
-			{
+			Instance._addedEgoMap.Add(name);
+			if (name != null && name != string.Empty) {
 				if (faction == Faction.Player) {
-					SingletonBehavior<BattleSceneRoot>.Instance.ChangeToCustomEgoMap<T>(name, faction, byAssimilationFlag: true);
+					ChangeToCustomEgoMap<T>(name, faction, byAssimilationFlag: true);
 				} else {
 					SingletonBehavior<BattleSceneRoot>.Instance.ChangeToSpecialMap(name, playEffect: true, scaleChange: false);
 				}
 			}
 		}
-		/// <inheritdoc cref="InitCustomMap(string)"/>
-		public static MapManager InitCustomMap<T>(this BattleSceneRoot _, string stageName)
-			where T : MapManager, IBGM, new()
-				=> CustomMapHandler.InitCustomMap<T>(stageName);
-		/// <inheritdoc cref="InitCustomMap(string)"/>
-		public static MapManager InitCustomMap<T>(this BattleSceneRoot _, string stageName,
-			bool isEgo = false) where T : MapManager, IBGM, new()
-				=> CustomMapHandler.InitCustomMap<T>(stageName, isEgo);
-		/// <inheritdoc cref="InitCustomMap(string)"/>
-		public static MapManager InitCustomMap<T>(this BattleSceneRoot _, string stageName,
-			bool isEgo = false, bool initBGMs = true) where T : MapManager, IBGM, new()
-				=> CustomMapHandler.InitCustomMap<T>(stageName, isEgo, initBGMs);
-		/// <inheritdoc cref="InitCustomMap(string)"/>
-		public static MapManager InitCustomMap<T>(this BattleSceneRoot _, string stageName,
-			float bgx = 0.5f, float bgy = 0.5f,
-			float floorx = 0.5f, float floory = (407.5f/1080f),
-			float underx = 0.5f, float undery = (300f/1080f)) where T : MapManager, IBGM, new()
-				=> CustomMapHandler.InitCustomMap<T>(stageName, bgx, bgy, floorx, floory, underx, undery);
-		/// <inheritdoc cref="InitCustomMap(string)"/>
-		public static MapManager InitCustomMap<T>(this BattleSceneRoot _, string stageName,
-			bool isEgo = false,
-			float bgx = 0.5f, float bgy = 0.5f,
-			float floorx = 0.5f, float floory = (407.5f/1080f),
-			float underx = 0.5f, float undery = (300f/1080f)) where T : MapManager, IBGM, new()
-				=> CustomMapHandler.InitCustomMap<T>(stageName, isEgo, bgx, bgy, floorx, floory, underx, undery);
-		/// <inheritdoc cref="InitCustomMap(string)"/>
-		public static MapManager InitCustomMap<T>(this BattleSceneRoot _, string stageName,
-			bool isEgo = false, bool initBGMs = true,
-			float bgx = 0.5f, float bgy = 0.5f,
-			float floorx = 0.5f, float floory = (407.5f/1080f),
-			float underx = 0.5f, float undery = (300f/1080f)) where T : MapManager, IBGM, new()
-				=> CustomMapHandler.InitCustomMap<T>(stageName, isEgo, initBGMs, bgx, bgy, floorx, floory, underx, undery);
-		/// <inheritdoc cref="InitCustomMap(string)"/>
-		public static MapManager InitCustomMap<T>(this BattleSceneRoot _, string stageName,
-			Offsets offsets) where T : MapManager, IBGM, new()
-				=> CustomMapHandler.InitCustomMap<T>(stageName, offsets);
-		public static MapManager InitCustomMap<T>(this BattleSceneRoot _, string stageName,
-			Offsets offsets,
-			bool isEgo = false) where T : MapManager, IBGM, new()
-				=> CustomMapHandler.InitCustomMap<T>(stageName, offsets, isEgo);
-		/// <inheritdoc cref="InitCustomMap(string)"/>
-		public static MapManager InitCustomMap<T>(this BattleSceneRoot _, string stageName,
-			Offsets offsets,
-			bool isEgo = false, bool initBGMs = true) where T : MapManager, IBGM, new()
-				=> CustomMapHandler.InitCustomMap<T>(stageName, offsets, isEgo, initBGMs);
+		public AudioClip[] GetCurrentThemes() => SingletonBehavior<BattleSoundManager>.Instance.GetCurrentThemes();
+		public AudioClip[] GetCurrentThemes(out bool isEnemy, out bool isEnemyDefault) =>
+			SingletonBehavior<BattleSoundManager>.Instance.GetCurrentThemes(out isEnemy, out isEnemyDefault);
+		public AudioClip[] GetEnemyThemes() => SingletonBehavior<BattleSoundManager>.Instance.GetEnemyThemes();
+	}
+
+	public static class Extensions {
 		/// <summary>
 		/// Gets the current playing theme.
 		/// </summary>
-		public static AudioClip[] GetCurrentTheme(this BattleSoundManager Instance) => GetCurrentTheme(Instance, out _);
+		public static AudioClip[] GetCurrentThemes(this BattleSoundManager Instance) => GetCurrentThemes(Instance, out _, out _);
 		/// <summary>
 		/// Gets the current playing theme and outputs whether it's an EnemyTheme.
 		/// </summary>
-		public static AudioClip[] GetCurrentTheme(this BattleSoundManager Instance, out bool isEnemy) {
-			var enemyThemes = GetEnemyTheme(Instance);
+		public static AudioClip[] GetCurrentThemes(this BattleSoundManager Instance, out bool isEnemy, out bool isEnemyDefault) {
+			var enemyThemes = GetEnemyThemes(Instance);
+			isEnemyDefault = enemyThemes.SequenceEqual(Instance.defaultEnemyThemeSound);
 			if (enemyThemes.Contains(Instance.CurrentPlayingTheme.clip)) {
 				isEnemy = true;
 				return enemyThemes;
 			}
-			Debug.LogWarning("Current theme is not in EnemyThemes, returning only the currently playing theme");
 			isEnemy = false;
-			return new AudioClip[]{Instance.CurrentPlayingTheme.clip};
+			return Instance.GetAllyThemes();
 		}
 		/// <summary>
-		/// Gets the current enemy theme.
+		/// Gets the current enemy themes.
 		/// </summary>
-		public static AudioClip[] GetEnemyTheme(this BattleSoundManager Instance) {
-			var enemyThemes = Instance.SetEnemyTheme(new AudioClip[]{null});
-			Instance.SetEnemyTheme(enemyThemes);
-			return enemyThemes;
+		public static AudioClip[] GetEnemyThemes(this BattleSoundManager Instance) => CopyArray(Instance.enemyThemeSound);
+		/// <summary>
+		/// Gets the current ally themes.
+		/// </summary>
+		public static AudioClip[] GetAllyThemes(this BattleSoundManager Instance) => CopyArray(Instance.allyThemeSound);
+		static T[] CopyArray<T>(T[] array) {
+			var arrayLength = array.Length;
+			var newArray = new T[arrayLength];
+			Array.Copy(array, newArray, arrayLength);
+			return newArray;
 		}
+		/* TODO Implement with SyncFix
+		/// <summary>
+		/// Changes to an already loaded map.
+		/// </summary>
+		/// <remarks>
+		/// Identical to vanilla ChangeToSpecialMap except it allows you to determine the direction of the particle effect.
+		/// </remarks>
+		/// <param name="mapName">The name of the target map</param>
+		/// <param name="playEffect">Determines what direction the transition special effect starts from</param>
+		/// <param name="scaleChange">Whether units are rescaled to the new map size</param>
+		public static bool ChangeToSpecialMap(
+			this BattleSceneRoot instance, string mapName, Faction? playEffect = Faction.Enemy, bool scaleChange = true)
+		{
+			if (string.IsNullOrEmpty(mapName)) {
+				return false;
+			}
+			List<MapManager> addedMapList = instance._addedMapList;
+			MapManager x2 = addedMapList?.Find((MapManager x) => x.name.Contains(mapName));
+			if (x2 != null && x2 != instance.currentMapObject) {
+				if (playEffect != null) {
+					instance._mapChangeFilter.StartMapChangingEffect((Direction)playEffect, particleOn: true);
+				}
+				if (instance.currentMapObject.isCreature) {
+					UnityEngine.Object.Destroy(instance.currentMapObject.gameObject);
+				}
+				else {
+					instance.currentMapObject.EnableMap(false);
+				}
+				instance.currentMapObject = x2;
+				if (!instance.currentMapObject.IsMapInitialized)
+				{
+					instance.currentMapObject.InitializeMap();
+				}
+				instance.currentMapObject.EnableMap(true);
+				instance.currentMapObject.PlayMapChangedSound();
+				SingletonBehavior<BattleCamManager>.Instance.SetVignetteColorBgCam(instance.currentMapObject.sephirahColor, true);
+				SingletonBehavior<BattleSoundManager>.Instance.SetEnemyTheme(instance.currentMapObject.mapBgm);
+				if (scaleChange)
+				{
+					foreach (BattleUnitModel battleUnitModel in BattleObjectManager.instance.GetList())
+					{
+						battleUnitModel.view.ChangeScale(instance.currentMapObject.mapSize);
+					}
+				}
+				return true;
+			}
+			return false;
+		}
+		*/
 	}
-	#endregion
 }

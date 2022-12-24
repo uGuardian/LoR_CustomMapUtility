@@ -1,23 +1,10 @@
 using System;
 using System.IO;
-using System.Collections;
-using System.Collections.Generic;
-using System.Collections.Specialized;
-using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
-using System.Linq;
-using System.Reflection;
 using UnityEngine;
-using UnityEngine.Networking;
-#if !NOMP3
-using NAudio.Wave;
-#endif
-using Mod;
 #pragma warning disable MA0048, MA0016, MA0051
 
-namespace CustomMapUtility {
-	#region WAV
-	#if !NOMP3
+namespace uGuardian.WAV {
 	[StructLayout(LayoutKind.Sequential, Pack=1)]
 	public readonly struct WAV {
 		private static float BytesToFloat(byte firstByte, byte secondByte)
@@ -37,9 +24,10 @@ namespace CustomMapUtility {
 		public readonly struct RIFF {
 			public RIFF(BinaryReader BinReader) {
 				ChunkID = BinReader.ReadUInt32();
-				if (ChunkID != 1179011410u) {
+				const uint expectedChunkID = 1179011410u;
+				if (ChunkID != expectedChunkID) {
 					Debug.LogWarning("Starting Header isn't RIFF, audio file is probably corrupt");
-					Debug.LogWarning("Should be ("+1179011410u+") but it's ("+ChunkID+")");
+					Debug.LogWarning("Should be ("+expectedChunkID+") but it's ("+ChunkID+")");
 					try {
 						ushort check;
 						retry:
@@ -435,6 +423,4 @@ namespace CustomMapUtility {
 			#pragma warning restore MA0011
 		}
 	}
-	#endif
-	#endregion
 }

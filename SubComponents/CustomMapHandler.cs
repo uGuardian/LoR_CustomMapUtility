@@ -6,9 +6,10 @@ using System.Collections.Specialized;
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Linq;
-using System.Reflection;
 using UnityEngine;
 using UnityEngine.Networking;
+using System.Threading.Tasks;
+using CustomMapUtility.Texture;
 #if !NOMP3
 using NAudio.Wave;
 #endif
@@ -17,7 +18,7 @@ using Mod;
 
 namespace CustomMapUtility {
 	/// <summary>
-	/// Contains all CustomMapUtility commands.
+	/// Contains all internal CustomMapUtility commands.
 	/// </summary>
 	public partial class CustomMapHandler {
 		#pragma warning restore IDE0051,IDE0059,CS0219,IDE1006
@@ -40,99 +41,135 @@ namespace CustomMapUtility {
 		/// <param name="undery">FloorUnder y pivot</param>
 		/// <param name="managerType">Your custom map manager</param>
 		/// <param name="offsets">A user-defined Offsets struct</param>
-		public static MapManager InitCustomMap<T>(string stageName) where T : MapManager, IBGM, new() {
+		public T InitCustomMap<T>(string stageName) where T : MapManager, ICMU, new() {
 			bool initBGMs = true;
 			if (mapOffsetsCache.TryGetValue(stageName, out Offsets offsets)) {
 				initBGMs = mapAutoBgmCache[stageName];
 				Debug.Log("CustomMapUtility: Loaded offsets from cache");
 			} else {offsets = new Offsets(0.5f, 0.5f);}
-			return new CustomMapHandler().Init(stageName, typeof(T), offsets, isEgo: false, initBGMs);
+			return new MapInstance<T>(this).Init(stageName, offsets, isEgo: false, initBGMs);
 		}
 		/// <inheritdoc cref="InitCustomMap(string)"/>
-		public static MapManager InitCustomMap<T>(string stageName,
-			bool isEgo = false) where T : MapManager, IBGM, new() {
+		public T InitCustomMap<T>(string stageName,
+			bool isEgo = false) where T : MapManager, ICMU, new() {
 				bool initBGMs = true;
 				if (mapOffsetsCache.TryGetValue(stageName, out Offsets offsets)) {
 					initBGMs = mapAutoBgmCache[stageName];
 					Debug.Log("CustomMapUtility: Loaded offsets from cache");
 				}
 				else {offsets = new Offsets(0.5f, 0.5f);}
-				return new CustomMapHandler().Init(stageName, typeof(T), offsets, isEgo, initBGMs);
+				return new MapInstance<T>(this).Init(stageName, offsets, isEgo, initBGMs);
 		}
 		/// <inheritdoc cref="InitCustomMap(string)"/>
-		public static MapManager InitCustomMap<T>(string stageName,
-			bool isEgo = false, bool initBGMs = true) where T : MapManager, IBGM, new() {
+		public T InitCustomMap<T>(string stageName,
+			bool isEgo = false, bool initBGMs = true) where T : MapManager, ICMU, new() {
 				if (mapOffsetsCache.TryGetValue(stageName, out Offsets offsets))
 				{
 					Debug.Log("CustomMapUtility: Loaded offsets from cache");
 				}
 				else { offsets = new Offsets(0.5f, 0.5f); }
-				return new CustomMapHandler().Init(stageName, typeof(T), offsets, isEgo, initBGMs);
+				return new MapInstance<T>(this).Init(stageName, offsets, isEgo, initBGMs);
 		}
 		/// <inheritdoc cref="InitCustomMap(string)"/>
-		public static MapManager InitCustomMap<T>(string stageName,
+		public T InitCustomMap<T>(string stageName,
 			float bgx = 0.5f, float bgy = 0.5f,
 			float floorx = 0.5f, float floory = (407.5f/1080f),
-			float underx = 0.5f, float undery = (300f/1080f)) where T : MapManager, IBGM, new() {
+			float underx = 0.5f, float undery = (300f/1080f)) where T : MapManager, ICMU, new() {
 				if (mapAutoBgmCache.TryGetValue(stageName, out bool initBGMs)) { }
 				else {initBGMs = true;}
 				var offsets = new Offsets(bgx, bgy, floorx, floory, underx, undery);
-				return new CustomMapHandler().Init(stageName, typeof(T), offsets, isEgo: false, initBGMs);
+				return new MapInstance<T>(this).Init(stageName, offsets, isEgo: false, initBGMs);
 		}
 		/// <inheritdoc cref="InitCustomMap(string)"/>
-		public static MapManager InitCustomMap<T>(string stageName,
+		public T InitCustomMap<T>(string stageName,
 			bool isEgo = false,
 			float bgx = 0.5f, float bgy = 0.5f,
 			float floorx = 0.5f, float floory = (407.5f/1080f),
-			float underx = 0.5f, float undery = (300f/1080f)) where T : MapManager, IBGM, new() {
+			float underx = 0.5f, float undery = (300f/1080f)) where T : MapManager, ICMU, new() {
 				if (mapAutoBgmCache.TryGetValue(stageName, out bool initBGMs)) { }
 				else {initBGMs = true;}
 				var offsets = new Offsets(bgx, bgy, floorx, floory, underx, undery);
-				return new CustomMapHandler().Init(stageName, typeof(T), offsets, isEgo, initBGMs);
+				return new MapInstance<T>(this).Init(stageName, offsets, isEgo, initBGMs);
 		}
 		/// <inheritdoc cref="InitCustomMap(string)"/>
-		public static MapManager InitCustomMap<T>(string stageName,
+		public T InitCustomMap<T>(string stageName,
 			bool isEgo = false, bool initBGMs = true,
 			float bgx = 0.5f, float bgy = 0.5f,
 			float floorx = 0.5f, float floory = (407.5f/1080f),
-			float underx = 0.5f, float undery = (300f/1080f)) where T : MapManager, IBGM, new() {
+			float underx = 0.5f, float undery = (300f/1080f)) where T : MapManager, ICMU, new() {
 				var offsets = new Offsets(bgx, bgy, floorx, floory, underx, undery);
-				return new CustomMapHandler().Init(stageName, typeof(T), offsets, isEgo, initBGMs);
+				return new MapInstance<T>(this).Init(stageName, offsets, isEgo, initBGMs);
 		}
 		/// <inheritdoc cref="InitCustomMap(string)"/>
-		public static MapManager InitCustomMap<T>(string stageName,
-			Offsets offsets) where T : MapManager, IBGM, new() {
+		public T InitCustomMap<T>(string stageName,
+			Offsets offsets) where T : MapManager, ICMU, new() {
 				if (mapAutoBgmCache.TryGetValue(stageName, out bool initBGMs)) { }
 				else {initBGMs = true;}
-				return new CustomMapHandler().Init(stageName, typeof(T), offsets, isEgo: false, initBGMs);
+				return new MapInstance<T>(this).Init(stageName, offsets, isEgo: false, initBGMs);
 		}
 		/// <inheritdoc cref="InitCustomMap(string)"/>
-		public static MapManager InitCustomMap<T>(string stageName,
+		public T InitCustomMap<T>(string stageName,
 			Offsets offsets,
-			bool isEgo = false) where T : MapManager, IBGM, new() {
+			bool isEgo = false) where T : MapManager, ICMU, new() {
 				if (mapAutoBgmCache.TryGetValue(stageName, out bool initBGMs)) { }
 				else {initBGMs = true;}
-				return new CustomMapHandler().Init(stageName, typeof(T), offsets, isEgo, initBGMs);
+				return new MapInstance<T>(this).Init(stageName, offsets, isEgo, initBGMs);
 		}
 		/// <inheritdoc cref="InitCustomMap(string)"/>
-		public static MapManager InitCustomMap<T>(string stageName,
+		public T InitCustomMap<T>(string stageName,
 			Offsets offsets,
-			bool isEgo = false, bool initBGMs = true) where T : MapManager, IBGM, new() {
-				return new CustomMapHandler().Init(stageName, typeof(T), offsets, isEgo, initBGMs);
+			bool isEgo = false, bool initBGMs = true) where T : MapManager, ICMU, new() {
+				return new MapInstance<T>(this).Init(stageName, offsets, isEgo, initBGMs);
 		}
 
-		protected MapManager Init(string stageName, Type managerType, Offsets offsets, bool isEgo, bool initBGMs) {
-			// Debug.LogWarning("CustomMapUtility: StageController.InitializeMap throwing a NullReferenceException on stage start is expected, you can freely ignore it");
-			List<MapManager> addedMapList = SingletonBehavior<BattleSceneRoot>.Instance.GetType().GetField("_addedMapList", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(SingletonBehavior<BattleSceneRoot>.Instance) as List<MapManager>;
-			MapManager x2 = addedMapList?.Find((MapManager x) => x.name.Contains(stageName));
-			if (x2 != null && managerType.Equals(x2)) {
-				Debug.LogWarning("CustomMapUtility: Map already loaded");
-				return x2;
+		internal readonly Dictionary<string, Offsets> mapOffsetsCache = new Dictionary<string, Offsets>(StringComparer.Ordinal);
+		internal readonly Dictionary<string, bool> mapAutoBgmCache = new Dictionary<string, bool>(StringComparer.Ordinal);
+	}
+	public interface ICMU {
+		CustomMapHandler Handler {get; set;}
+	}
+	public class MapInstance<T> where T : MapManager, ICMU, new() {
+		readonly public CustomMapHandler handler;
+		CustomMapHandler audioHandler;
+		protected T manager;
+		protected Offsets offsets;
+		protected bool loadIsInitted;
+		protected string stageName;
+		protected Task imageInitTask;
+		public CustomMapHandler AudioHandler {
+			get => audioHandler ?? handler;
+			set => audioHandler = value;
+		}
+		public MapInstance(CustomMapHandler handler) {
+			this.handler = handler;
+			var allImageNames = AllImageNames;
+			newAssets = new Dictionary<string, Sprite>(allImageNames.Count, StringComparer.OrdinalIgnoreCase);
+			foreach (var name in allImageNames) {
+				newAssets.Add(name, null);
 			}
+		}
+		public CustomMapHandler.ModResources.CMUContainer Container => handler.container;
+		public virtual T Init(string stageName, Offsets offsets, bool isEgo, bool initBGMs) {
+			// Debug.LogWarning("CustomMapUtility: StageController.InitializeMap throwing a NullReferenceException on stage start is expected, you can freely ignore it");
+			List<MapManager> addedMapList = SingletonBehavior<BattleSceneRoot>.Instance._addedMapList;
+			MapManager x2 = addedMapList?.Find((MapManager x) => x.name.Contains(stageName));
+			if (x2 != null) {
+				if (x2 is T x2t) {
+					Debug.LogWarning("CustomMapUtility: A map with an overlapping name and type is already loaded");
+					return x2t;
+				} else {
+					Debug.LogError("CustomMapUtility: A map with an overlapping name and a different type is already loaded");
+					return null;
+				}
+			}
+			this.stageName = stageName;
+			this.offsets = offsets;
 
-			GameObject mapObject = Util.LoadPrefab("InvitationMaps/InvitationMap_Philip1", SingletonBehavior<BattleSceneRoot>.Instance.transform);
+			var mapObject = Util.LoadPrefab("InvitationMaps/InvitationMap_Philip1", SingletonBehavior<BattleSceneRoot>.Instance.transform);
 
 			#region InheritanceDebug
+			#if InheritanceDebug
+			var managerType = typeof(T);
 			Type managerTypeInherit = managerType;
 			string managerTypeName = managerTypeInherit.Name;
 			while (managerTypeInherit != typeof(MapManager)) {
@@ -140,46 +177,37 @@ namespace CustomMapUtility {
 				managerTypeName = $"{managerTypeInherit.Name}:{managerTypeName}";
 			}
 			Debug.Log($"CustomMapUtility: Initializing {stageName} with {managerTypeName}");
+			#endif
 			#endregion
 			
 			mapObject.name = "InvitationMap_"+stageName;
-			var manager = InitManager(managerType, mapObject);
-
-			var currentStagePath = ModResources.GetStagePath(stageName);
-			newAssets = new ListDictionary(StringComparer.Ordinal){
-				{"newBG", ImageLoad("Background", currentStagePath)},
-				{"newFloor", ImageLoad("Floor", currentStagePath)},
-				{"newUnder", ImageLoad("FloorUnder", currentStagePath)},
-				{"scratch1", ImageLoad("Scratch1", currentStagePath)},
-				{"scratch2", ImageLoad("Scratch2", currentStagePath)},
-				{"scratch3", ImageLoad("Scratch3", currentStagePath)},
-			};
-			string log = "CustomMapUtility: New Assets: {";
-			foreach (DictionaryEntry img in newAssets) {
-				log += Environment.NewLine+"	";
-				if (img.Value != null) {
-					log += img.Key+":True";
-				} else {
-					log += img.Key+":False";
-				}
+			T manager = InitManager(mapObject);
+			var managerAsync = manager as IAsyncMapInit;
+			if (managerAsync != null) {
+				imageInitTask = ImageInit_Async();
+			} else {
+				throw new NotImplementedException("Synchronous Init is not currently available");
+				// ImageInit(stageName, offsets, manager);
 			}
-			log += Environment.NewLine+"}";
-			Debug.Log(log);
-			SetTextures(manager, offsets);
-			SetScratches(stageName, manager);
 			// Don't ever call SingletonBehavior<BattleSoundManager>.Instance.OnStageStart()
 			if (initBGMs) {
 				try {
 					if (manager is IBGM managerTemp) {
 						var bgms = managerTemp.GetCustomBGMs();
 						if (bgms != null && bgms.Length != 0) {
-							manager.mapBgm = CustomBgmParse(bgms);
+							if (managerAsync == null) {
+								manager.mapBgm = AudioHandler.CustomBgmParse(bgms);
+							} else {
+								AudioHandler.CustomBgmParseAsync(bgms);
+								managerAsync.FirstLoad += (object sender, EventArgs e) =>
+									manager.mapBgm = AudioHandler.GetAudioClip(bgms);
+							}
 						} else {
 							Debug.Log("CustomMapUtility: CustomBGMs is null or empty, enabling AutoBGM");
 							managerTemp.AutoBGM = true;
 						}
 					} else {
-						Debug.LogError("CustomMapUtility: MapManager is not inherited from Custom(Creature)MapManager");
+						Debug.LogWarning("CustomMapUtility: MapManager does not inherit from IBGM");
 					}
 				} catch (Exception ex) {
 					Debug.LogError("CustomMapUtility: Failed to get BGMs");
@@ -192,27 +220,156 @@ namespace CustomMapUtility {
 				SingletonBehavior<BattleSceneRoot>.Instance.InitInvitationMap(manager);
 				Debug.Log("CustomMapUtility: Map Initialized.");
 			} else {
-				manager.GetType().GetField("_bMapInitialized", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(manager, value: false);
+				manager._bMapInitialized = false;
 				SingletonBehavior<BattleSceneRoot>.Instance.AddEgoMap(manager);
 				Debug.Log("CustomMapUtility: EGO Map Added.");
-				mapOffsetsCache[stageName] = offsets;
-				mapAutoBgmCache[stageName] = initBGMs;
+				handler.mapOffsetsCache[stageName] = offsets;
+				handler.mapAutoBgmCache[stageName] = initBGMs;
 			}
 			return manager;
 		}
 
-		private static readonly Dictionary<string, Offsets> mapOffsetsCache = new Dictionary<string, Offsets>(StringComparer.Ordinal);
-		private static readonly Dictionary<string, bool> mapAutoBgmCache = new Dictionary<string, bool>(StringComparer.Ordinal);
+		protected virtual HashSet<string> AllImageNames => new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
+			"Background",
+			"Floor",
+			"FloorUnder",
+			"Scratch1",
+			"Scratch2",
+			"Scratch3",
+		};
 
-		private void SetTextures(MapManager manager, Offsets offsets) {
-			foreach (var component in manager.GetComponentsInChildren<Component>()) {
+		[Obsolete("Synchronous Init is not currently available", true)]
+		protected virtual void ImageInit(string stageName, Offsets offsets, T manager) {
+			var currentStageDir = Container.GetStageDir(stageName);
+		}
+
+		protected async virtual Task ImageInit_Async() {
+			var managerAsync = manager as IAsyncMapInit;
+			var currentStageDir = Container.GetStageDir(stageName);
+			var imageNames = AllImageNames;
+			int totalCount = AllImageNames.Count;
+			int curIndex = 0;
+			var spriteTasks = new Dictionary<string, Task<Sprite>>(totalCount, StringComparer.OrdinalIgnoreCase);
+			foreach (var file in currentStageDir.EnumerateFiles()) {
+				var croppedName = file.Name;
+				croppedName = croppedName.Substring(0, croppedName.IndexOf('.'));
+				if (imageNames.TryGetValue(croppedName, out var imageName)) {
+					spriteTasks[imageName] = SpriteLoad_Async(imageName, file);
+					curIndex++;
+				}
+				if (curIndex >= totalCount) {break;}
+			}
+			managerAsync.FirstLoad += CompleteImageInit;
+
+			foreach (var entry in spriteTasks) {
+				entry.Deconstruct(out var name, out var task);
+				newAssets[name] = await task;
+			}
+
+			SetTextures(manager);
+			SetScratches(stageName, manager);
+		}
+
+		/*
+		protected void DebugNewAssets() {
+			string log = "CustomMapUtility: New Assets: {";
+			foreach (DictionaryEntry img in newAssets) {
+				log += Environment.NewLine + "	";
+				if (img.Value != null) {
+					log += img.Key + ":True";
+				} else {
+					log += img.Key + ":False";
+				}
+			}
+			log += Environment.NewLine + "}";
+			Debug.Log(log);
+		}
+		*/
+
+		protected void CompleteImageInit(object sender, EventArgs e) {
+			TextureCache.AwaitCompletion(imageInitTask);
+		}
+
+		public async Task<Sprite> SpriteLoad_Async(string name, FileInfo file) {
+			Texture2D texture;
+			Sprite sprite;
+			try {
+				texture = await TextureCache.GetFile_Async(file);
+			}
+			#if !DEBUG
+			catch {
+				return null;
+			}
+			#else
+			catch (AggregateException ex) {
+				ex.Handle((e) => {
+						Debug.LogException(e);
+						return true;
+					}
+				);
+				return null;
+			} catch (Exception ex) {
+				Debug.LogException(ex);
+				return null;
+			}
+			#endif
+			float pixelsPerUnit;
+			switch (name) {
+				case "Background":
+					pixelsPerUnit = 100f/1920f*texture.width;
+					sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), offsets.BGOffset, pixelsPerUnit);
+					break;
+				case "Floor":
+					pixelsPerUnit = 100f/1920f*texture.width;
+					sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), offsets.FloorOffset, pixelsPerUnit);
+					break;
+				case "FloorUnder":
+					pixelsPerUnit = 100f/1920f*texture.width;
+					sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), offsets.UnderOffset, pixelsPerUnit);
+					break;
+				case "Scratch1":
+					sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, (58.15f/170f)), (100f));
+					break;
+				case "Scratch2":
+					sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, (24.88f/86f)), (100f));
+					break;
+				case "Scratch3":
+					sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, (8.18f/19f)), (100f));
+					break;
+				default:
+					sprite = null;
+					break;
+			}
+			return sprite;
+		}
+		internal static TextureCache TextureCache {get {
+			if (textureCache == null) {
+				textureCache = SingletonBehavior<BattleScene>.Instance.gameObject.GetComponent<TextureCache>();
+				if (textureCache == null) {
+					textureCache = SingletonBehavior<BattleScene>.Instance.gameObject.AddComponent<TextureCache>();
+				}
+			}
+			return textureCache;
+		}}
+		static TextureCache textureCache = null;
+		public async Task<byte[]> LoadFile(FileInfo file) {
+			byte[] result;
+			using (var stream = file.OpenRead()) {
+				result = new byte[stream.Length];
+				await stream.ReadAsync(result, 0, (int)stream.Length).ConfigureAwait(false);
+			}
+			return result;
+		}
+
+		protected virtual void SetTextures(T manager) {
+			foreach (var component in manager.GetComponentsInChildren<Component>(true)) {
+				Sprite sprite;
 				switch (component) {
 					case SpriteRenderer renderer when string.Equals(renderer.name, "BG", StringComparison.Ordinal):
 					{
-						Texture2D texture = (Texture2D)newAssets["newBG"];
-						if (texture != null) {
-							float pixelsPerUnit = 100f/1920f*texture.width;
-							renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), offsets.BGOffset, pixelsPerUnit);
+						sprite = newAssets["Background"];
+						if (sprite != null) {
+							renderer.sprite = sprite;
 						} else {
 							renderer.gameObject.SetActive(false);
 						}
@@ -220,10 +377,9 @@ namespace CustomMapUtility {
 					}
 					case SpriteRenderer renderer when renderer.name.Contains("Floor"):
 					{
-						Texture2D texture = (Texture2D)newAssets["newFloor"];
-						if (texture != null) {
-							float pixelsPerUnit = 100f/1920f*texture.width;
-							renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), offsets.FloorOffset, pixelsPerUnit);
+						sprite = newAssets["Floor"];
+						if (sprite != null) {
+							renderer.sprite = sprite;
 						} else {
 							renderer.gameObject.SetActive(false);
 						}
@@ -231,10 +387,9 @@ namespace CustomMapUtility {
 					}
 					case SpriteRenderer renderer when renderer.name.Contains("Under"):
 					{
-						Texture2D texture = (Texture2D)newAssets["newUnder"];
-						if (texture != null) {
-							float pixelsPerUnit = 100f/1920f*texture.width;
-							renderer.sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), offsets.UnderOffset, pixelsPerUnit);
+						sprite = newAssets["FloorUnder"];
+						if (sprite != null) {
+							renderer.sprite = sprite;
 						} else {
 							renderer.gameObject.SetActive(false);
 						}
@@ -250,7 +405,8 @@ namespace CustomMapUtility {
 				}
 			}
 		}
-		private Texture2D ImageLoad(string name, string currentStagePath) {
+		[Obsolete("Undergoing replacement")]
+		protected virtual Texture2D ImageLoad(string name, string currentStagePath) {
 			Texture2D texture = new Texture2D(2, 2);
 			try {
 				var path = $"{currentStagePath}/{name}";
@@ -271,14 +427,19 @@ namespace CustomMapUtility {
 			}
 			return texture;
 		}
-		private ListDictionary newAssets;
-		private void SetScratches(string stageName, MapManager manager) {
-			if (newAssets["scratch3"] == null && newAssets["scratch2"] == null && newAssets["scratch1"] == null) {
+		readonly protected internal Dictionary<string, Sprite> newAssets;
+		protected virtual void SetScratches(string stageName, T manager) {
+			var scratch1 = newAssets["Scratch1"];
+			var scratch2 = newAssets["Scratch2"];
+			var scratch3 = newAssets["Scratch3"];
+			if (scratch3 == null && scratch2 == null && scratch1 == null) {
 				manager.scratchPrefabs = Array.Empty<GameObject>();
 				return;
 			}
-			Texture2D texture;
+			Sprite sprite;
+			#if DEBUG
 			string log = "CustomMapUtility: SetScratches: {";
+			#endif
 			int i;
 			string name = "";
 			for (i = 0; i < 3; i++) {
@@ -296,12 +457,12 @@ namespace CustomMapUtility {
 				GameObject current;
 				switch (i) {
 					case 2: {
-						texture = (Texture2D)newAssets["scratch3"];
-						if (texture != null) {
+						sprite = scratch3;
+						if (sprite != null) {
 							if (i == 2) {
 								current = UnityEngine.Object.Instantiate(manager.scratchPrefabs[2]);
 								current.name = stageName+name;
-								current.GetComponent<SpriteRenderer>().sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, (58.15f/170f)), (100f));
+								current.GetComponent<SpriteRenderer>().sprite = sprite;
 							} else {
 								current = manager.scratchPrefabs[2];
 							}
@@ -310,12 +471,12 @@ namespace CustomMapUtility {
 						goto case 1;
 					}
 					case 1: {
-						texture = (Texture2D)newAssets["scratch2"];
-						if (texture != null) {
+						sprite = scratch2;
+						if (sprite != null) {
 							if (i == 1) {
 								current = UnityEngine.Object.Instantiate(manager.scratchPrefabs[1]);
 								current.name = stageName+name;
-								current.GetComponent<SpriteRenderer>().sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, (24.88f/86f)), (100f));
+								current.GetComponent<SpriteRenderer>().sprite = sprite;
 							} else {
 								current = manager.scratchPrefabs[1];
 							}
@@ -324,12 +485,12 @@ namespace CustomMapUtility {
 						goto case 0;
 					}
 					case 0: {
-						texture = (Texture2D)newAssets["scratch1"];
-						if (texture != null) {
+						sprite = scratch1;
+						if (sprite != null) {
 							if (i == 0) {
 								current = UnityEngine.Object.Instantiate(manager.scratchPrefabs[0]);
 								current.name = stageName+name;
-								current.GetComponent<SpriteRenderer>().sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, (8.18f/19f)), (100f));
+								current.GetComponent<SpriteRenderer>().sprite = sprite;
 							} else {
 								current = manager.scratchPrefabs[0];
 							}
@@ -343,20 +504,22 @@ namespace CustomMapUtility {
 					}
 				}
 				manager.scratchPrefabs[i] = current;
-				try {
-					log += $"{Environment.NewLine}	Scratch{i} = {current.name}";
-				} catch {
-					log += $"{Environment.NewLine}	Scratch{i} = null";
-				}
+				#if DEBUG
+				log += $"{Environment.NewLine}	Scratch{i} = {current?.name ?? "null"}";
+				#endif
 			}
+			#if DEBUG
 			log += Environment.NewLine+"}";
 			Debug.Log(log);
+			#endif
 		}
 		#endregion
 		#region MANAGER
-		private MapManager InitManager(Type managerType, GameObject mapObject) {
+		protected virtual T InitManager(GameObject mapObject) {
 			MapManager original = mapObject.GetComponent<MapManager>();
-			MapManager newManager = mapObject.AddComponent(managerType) as MapManager;
+			T newManager = mapObject.AddComponent<T>();
+
+			newManager.Handler = handler;
 
 			newManager.isActivated = original.isActivated;
 			newManager.isEnabled = original.isEnabled;
@@ -367,19 +530,13 @@ namespace CustomMapUtility {
 			newManager.sephirahColor = original.sephirahColor;
 			newManager.scratchPrefabs = original.scratchPrefabs;
 			newManager.wallCratersPrefabs = original.wallCratersPrefabs;
-
-			try {
-			rootField.SetValue(newManager, rootField.GetValue(original));
-			// obstacleRootField.SetValue(newManager, obstacleRootField.GetValue(original));
-			} catch {
-				Debug.LogWarning("CustomMapUtility: InitManager had a minor error", newManager);
-			}
+			newManager._roots = original._roots;
+			newManager._obstacleRoot = original._obstacleRoot;
 
 			UnityEngine.Object.Destroy(original);
+			manager = newManager;
 			return newManager;
 		}
-		private static readonly FieldInfo rootField = typeof(MapManager).GetField("_roots", BindingFlags.NonPublic | BindingFlags.Instance);
-		// private static readonly FieldInfo obstacleRootField = typeof(MapManager).GetField("_obstacleRoot", BindingFlags.NonPublic | BindingFlags.Instance);
 		#endregion
 	}
 }

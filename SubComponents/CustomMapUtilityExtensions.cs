@@ -16,6 +16,11 @@ using Mod;
 
 namespace CustomMapUtility {
 	public partial class CustomMapHandler {
+		public void StartActAsCustomMap<T>(string mapName) where T : MapManager, IBGM, new() {
+			CustomMapHandler.AntiEardrumDamage();
+			ChangeToCustomMap<T>(mapName, playEffect: null);
+			SingletonBehavior<BattleSoundManager>.Instance.ChangeEnemyTheme(0);
+		}
 		/// <summary>
 		/// Changes to a custom map while insuring it's initialized.
 		/// </summary>

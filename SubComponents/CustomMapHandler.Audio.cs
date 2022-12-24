@@ -401,6 +401,26 @@ namespace CustomMapUtility
 					waveModel.team.emotionTotalBonus = 0;
 			}
 		}
+		/// <summary>
+		/// Call this method before changing to your map to stop it from breaking the user's eardrums
+		/// </summary>
+		/// <param name="enemy">Whether this is operating on EnemyTheme or AllyTheme</param>
+		public static void AntiEardrumDamage(bool enemy = true) {
+			if (enemy) {
+				SingletonBehavior<BattleSoundManager>.Instance.SetEnemyTheme(new AudioClip[] {
+					AudioClip.Create("AntiEardrumDamage", 1, 1, 1000, stream: false),
+				});
+				SingletonBehavior<BattleSoundManager>.Instance.ChangeEnemyTheme(0);
+			} else {
+				SingletonBehavior<BattleSoundManager>.Instance.SetAllyTheme(new AudioClip[] {
+					AudioClip.Create("AntiEardrumDamage", 1, 1, 1000, stream: false),
+				});
+				SingletonBehavior<BattleSoundManager>.Instance.ChangeAllyTheme(0);
+			}
+			#if DEBUG
+			Debug.Log($"CustomMapUtility: Don't break my eardrums please; Called AntiEardrumDamage({enemy})");
+			#endif
+		}
 		#endregion
 	}
 }

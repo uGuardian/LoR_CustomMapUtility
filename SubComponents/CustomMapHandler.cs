@@ -198,9 +198,19 @@ namespace CustomMapUtility {
 							if (managerAsync == null) {
 								manager.mapBgm = AudioHandler.CustomBgmParse(bgms);
 							} else {
+								// This is a mediocre auto-fix to the volume spike.
 								AudioHandler.CustomBgmParseAsync(bgms);
-								managerAsync.FirstLoad += (object sender, EventArgs e) =>
-									manager.mapBgm = AudioHandler.GetAudioClip(bgms);
+								managerAsync.FirstLoad += (object sender, EventArgs e) => {
+									var clips = AudioHandler.GetAudioClip(bgms);
+									/*
+									var soundManager = SingletonBehavior<BattleSoundManager>.Instance;
+									var currentPlayingTheme = soundManager.CurrentPlayingTheme;
+									if (!clips.Contains(currentPlayingTheme.clip)) {
+										CustomMapHandler.AntiEardrumDamage(currentPlayingTheme != soundManager._currentAllyTheme);
+									}
+									*/
+									manager.mapBgm = clips;
+								};
 							}
 						} else {
 							Debug.Log("CustomMapUtility: CustomBGMs is null or empty, enabling AutoBGM");

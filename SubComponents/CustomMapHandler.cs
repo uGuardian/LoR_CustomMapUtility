@@ -155,10 +155,10 @@ namespace CustomMapUtility {
 			MapManager x2 = addedMapList?.Find((MapManager x) => x.name.Contains(stageName));
 			if (x2 != null) {
 				if (x2 is T x2t) {
-					Debug.LogWarning("CustomMapUtility: A map with an overlapping name and type is already loaded");
+					Debug.LogWarning("CustomMapUtility: A map with an overlapping name and manager is already loaded");
 					return x2t;
 				} else {
-					Debug.LogError("CustomMapUtility: A map with an overlapping name and a different type is already loaded");
+					Debug.LogError("CustomMapUtility: A map with an overlapping name and a different manager is already loaded");
 					return null;
 				}
 			}
@@ -186,8 +186,10 @@ namespace CustomMapUtility {
 			if (managerAsync != null) {
 				imageInitTask = ImageInit_Async();
 			} else {
-				throw new NotImplementedException("Synchronous Init is not currently available");
-				// ImageInit(stageName, offsets, manager);
+				Debug.LogWarning($"CustomMapUtility: {typeof(T)} does not implement IAsyncMapInit");
+				#pragma warning disable CS0618
+				ImageInit();
+				#pragma warning restore CS0618
 			}
 			// Don't ever call SingletonBehavior<BattleSoundManager>.Instance.OnStageStart()
 			if (initBGMs) {
@@ -198,17 +200,13 @@ namespace CustomMapUtility {
 							if (managerAsync == null) {
 								manager.mapBgm = AudioHandler.CustomBgmParse(bgms);
 							} else {
-								// This is a mediocre auto-fix to the volume spike.
 								AudioHandler.CustomBgmParseAsync(bgms);
 								managerAsync.FirstLoad += (object sender, EventArgs e) => {
 									var clips = AudioHandler.GetAudioClip(bgms);
-									/*
-									var soundManager = SingletonBehavior<BattleSoundManager>.Instance;
-									var currentPlayingTheme = soundManager.CurrentPlayingTheme;
-									if (!clips.Contains(currentPlayingTheme.clip)) {
-										CustomMapHandler.AntiEardrumDamage(currentPlayingTheme != soundManager._currentAllyTheme);
+									if (!isEgo) {
+										// This is a very rudimentary auto-handler, it's far from perfect
+										CustomMapHandler.AntiEardrumDamage_Checked(true, clips);
 									}
-									*/
 									manager.mapBgm = clips;
 								};
 							}
@@ -233,9 +231,9 @@ namespace CustomMapUtility {
 				manager._bMapInitialized = false;
 				SingletonBehavior<BattleSceneRoot>.Instance.AddEgoMap(manager);
 				Debug.Log("CustomMapUtility: EGO Map Added.");
-				handler.mapOffsetsCache[stageName] = offsets;
-				handler.mapAutoBgmCache[stageName] = initBGMs;
 			}
+			handler.mapOffsetsCache[stageName] = offsets;
+			handler.mapAutoBgmCache[stageName] = initBGMs;
 			return manager;
 		}
 
@@ -248,9 +246,24 @@ namespace CustomMapUtility {
 			"Scratch3",
 		};
 
-		[Obsolete("Synchronous Init is not currently available", true)]
-		protected virtual void ImageInit(string stageName, Offsets offsets, T manager) {
+		[Obsolete("Use Async Init where possible instead")]
+		protected virtual void ImageInit() {
 			var currentStageDir = Container.GetStageDir(stageName);
+			var imageNames = AllImageNames;
+			int totalCount = AllImageNames.Count;
+			int curIndex = 0;
+			foreach (var file in currentStageDir.EnumerateFiles()) {
+				var croppedName = file.Name;
+				croppedName = croppedName.Substring(0, croppedName.IndexOf('.'));
+				if (imageNames.TryGetValue(croppedName, out var imageName)) {
+					newAssets[imageName] = SpriteLoad(imageName, file);
+					curIndex++;
+				}
+				if (curIndex >= totalCount) {break;}
+			}
+
+			SetTextures(manager);
+			SetScratches(stageName, manager);
 		}
 
 		protected async virtual Task ImageInit_Async() {
@@ -300,9 +313,32 @@ namespace CustomMapUtility {
 			TextureCache.AwaitCompletion(imageInitTask);
 		}
 
+		public Sprite SpriteLoad(string name, FileInfo file) {
+			Texture2D texture;
+			try {
+				texture = TextureCache.GetFile(file);
+			}
+			#if !DEBUG
+			catch {
+				return null;
+			}
+			#else
+			catch (AggregateException ex) {
+				ex.Handle((e) => {
+						Debug.LogException(e);
+						return true;
+					}
+				);
+				return null;
+			} catch (Exception ex) {
+				Debug.LogException(ex);
+				return null;
+			}
+			#endif
+			return CreateSprite(name, texture);
+		}
 		public async Task<Sprite> SpriteLoad_Async(string name, FileInfo file) {
 			Texture2D texture;
-			Sprite sprite;
 			try {
 				texture = await TextureCache.GetFile_Async(file);
 			}
@@ -322,7 +358,11 @@ namespace CustomMapUtility {
 				Debug.LogException(ex);
 				return null;
 			}
-			#endif
+#endif
+			return CreateSprite(name, texture);
+		}
+		protected virtual Sprite CreateSprite(string name, Texture2D texture) {
+			Sprite sprite;
 			float pixelsPerUnit;
 			switch (name) {
 				case "Background":
@@ -362,14 +402,6 @@ namespace CustomMapUtility {
 			return textureCache;
 		}}
 		static TextureCache textureCache = null;
-		public async Task<byte[]> LoadFile(FileInfo file) {
-			byte[] result;
-			using (var stream = file.OpenRead()) {
-				result = new byte[stream.Length];
-				await stream.ReadAsync(result, 0, (int)stream.Length).ConfigureAwait(false);
-			}
-			return result;
-		}
 
 		protected virtual void SetTextures(T manager) {
 			foreach (var component in manager.GetComponentsInChildren<Component>(true)) {
@@ -414,28 +446,6 @@ namespace CustomMapUtility {
 					}
 				}
 			}
-		}
-		[Obsolete("Undergoing replacement")]
-		protected virtual Texture2D ImageLoad(string name, string currentStagePath) {
-			Texture2D texture = new Texture2D(2, 2);
-			try {
-				var path = $"{currentStagePath}/{name}";
-				var pngPath = $"{path}.png";
-				var jpgPath = $"{path}.jpg";
-				var jpegPath = $"{path}.jpeg";
-				if (File.Exists(pngPath)) {
-					texture.LoadImage(File.ReadAllBytes(pngPath));
-				} else if (File.Exists(jpgPath)) {
-					texture.LoadImage(File.ReadAllBytes(jpgPath));
-				} else if (File.Exists(jpegPath)) {
-					texture.LoadImage(File.ReadAllBytes(jpegPath));
-				} else {
-					return null;
-				}
-			} catch {
-				return null;
-			}
-			return texture;
 		}
 		readonly protected internal Dictionary<string, Sprite> newAssets;
 		protected virtual void SetScratches(string stageName, T manager) {

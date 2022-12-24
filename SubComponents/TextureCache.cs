@@ -8,6 +8,7 @@ using UnityEngine;
 using UnityEngine.Networking;
 using CustomMapUtility.Caching;
 using System.IO;
+using uGuardian.Utilities;
 
 namespace CustomMapUtility.Texture {
 	internal sealed class TextureCache : FileCache<Texture2D> {

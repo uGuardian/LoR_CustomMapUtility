@@ -9,6 +9,7 @@ using CustomMapUtility.Caching;
 using System.IO;
 using System.Threading.Tasks;
 using uGuardian.WAV;
+using uGuardian.Utilities;
 #if !NOMP3
 using NAudio.Wave;
 #endif

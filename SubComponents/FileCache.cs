@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
 using System.IO;
+using uGuardian.Utilities;
 
 namespace CustomMapUtility.Caching {
 	public abstract class FileCache<T> : MonoBehaviour where T : class {

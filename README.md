@@ -10,3 +10,7 @@ You can find info over at https://github.com/uGuardian/LoR_CustomMapUtility/wiki
 The Resources folder is included in your own mod, rename Template to your map name and include whichever image files you need. Only Background and Floor are required.
 
 Can be used as a psuedo sound file loader, proper as one coming soon.
+
+FAQ:
+Q:  What's the asset bundle for? Is it neccecary?
+A:  It's an optimization to improve load times slightly. CMU technically works without it but it runs better if you have it.

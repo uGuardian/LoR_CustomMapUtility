@@ -409,7 +409,7 @@ namespace CustomMapUtility
 		/// Call this method before changing to your map to stop it from breaking the user's eardrums
 		/// </summary>
 		/// <param name="enemy">Whether this is operating on EnemyTheme or AllyTheme</param>
-		public static void AntiEardrumDamage(bool enemy = true) {
+		public void AntiEardrumDamage(bool enemy = true) {
 			var instance = SingletonBehavior<BattleSoundManager>.Instance;
 			var antiEardrumDamageClip = AudioClip.Create("AntiEardrumDamage", 1, 1, 1000, stream: false);
 			var antiEardrumDamageClipArray = new AudioClip[] {
@@ -430,7 +430,7 @@ namespace CustomMapUtility
 			Debug.Log($"CustomMapUtility: Don't break my eardrums please; Called AntiEardrumDamage({enemy})");
 			#endif
 		}
-		public static void AntiEardrumDamage_Checked(bool enemy, params AudioClip[] clips) {
+		public void AntiEardrumDamage_Checked(bool enemy, params AudioClip[] clips) {
 			var instance = SingletonBehavior<BattleSoundManager>.Instance;
 			AudioSource checkedTheme;
 			if (enemy) {
@@ -442,8 +442,8 @@ namespace CustomMapUtility
 			if (currentTheme == checkedTheme && clips[GetCurrentEmotionIndex(clips)] == currentTheme.clip) {return;}
 			AntiEardrumDamage(enemy);
 		}
-		public static int GetCurrentEmotionIndex(params AudioClip[] clips) => GetCurrentEmotionIndex(clips.Length - 1);
-		public static int GetCurrentEmotionIndex(int maxIndex) {
+		public int GetCurrentEmotionIndex(params AudioClip[] clips) => GetCurrentEmotionIndex(clips.Length - 1);
+		public int GetCurrentEmotionIndex(int maxIndex) {
 			int emotionLevel = Singleton<StageController>.Instance.GetCurrentStageFloorModel().team.emotionLevel;
 			int idx = 0;
 			switch (emotionLevel)

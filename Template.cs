@@ -2,16 +2,17 @@ using CustomMapUtility;
 
 namespace Template {
     public class EnemyTeamStageManager_Template : EnemyTeamStageManager {
+        CustomMapHandler cmh = new CustomMapHandler("TemplateModId");
         public override void OnWaveStart() {
             // This method must be called somewhere, and only once. StageManager or Passive in the OnWaveStart() method is recommended.
             // You MUST have <MapInfo>Template</MapInfo> inside your StageInfo.xml file. (Replace Template with your stage name)
             
             // When you call this method, you supply the stage name and then your map manager.
-            CustomMapHandler.InitCustomMap<TemplateMapManager>("Template");
+            cmh.InitCustomMap<TemplateMapManager>("Template");
         }
         public override void OnRoundStart() {
             // Calling this will inform the game that the custom map should be the active one. Should be called in OnRoundStart() in a stage manager or passive.
-            CustomMapHandler.EnforceMap();
+            cmh.EnforceMap();
         }
     }
 

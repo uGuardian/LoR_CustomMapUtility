@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using UnityEngine;
-#pragma warning disable MA0048, MA0016, MA0051
+#pragma warning disable MA0048, MA0016, MA0051, CS1591
 
 namespace uGuardian.WAV {
 	[StructLayout(LayoutKind.Sequential, Pack=1)]

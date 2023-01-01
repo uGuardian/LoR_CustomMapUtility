@@ -120,7 +120,7 @@ namespace CustomMapUtility
 		/// Loads multiple sound files and outputs it as an AudioClip array.
 		/// </summary>
 		/// <param name="bgmNames">An array of audio file names (including extensions).</param>
-		/// <param name="clip">The loaded AudioClip</param>
+		/// <param name="clips">The loaded AudioClips</param>
 		public void LoadEnemyTheme(string[] bgmNames, out AudioClip[] clips) => clips = CustomBgmParse(bgmNames);
 		/// <summary>
 		/// Sets the current EnemyTheme using a loaded AudioClip.
@@ -390,6 +390,10 @@ namespace CustomMapUtility
 			var emotionTotalCoinNumber = Singleton<StageController>.Instance.GetCurrentStageFloorModel().team.emotionTotalCoinNumber;
 			Singleton<StageController>.Instance.GetCurrentWaveModel().team.emotionTotalBonus = emotionTotalCoinNumber + 1;
 		}
+		/// <summary>
+		/// Informs the game that the enemy's (and by extension custom) music shouldn't be active.
+		/// </summary>
+		/// <param name="force">Forces the command even if it appears something else has set the theme</param>
 		public void UnEnforceTheme(bool force = false) {
 			var emotionTotalCoinNumber = Singleton<StageController>.Instance.GetCurrentStageFloorModel().team.emotionTotalCoinNumber;
 			var stageFloorModel = Singleton<StageController>.Instance.GetCurrentStageFloorModel();

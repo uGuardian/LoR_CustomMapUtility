@@ -362,7 +362,4 @@
 	<!--PackageReference Include="Microsoft.CodeDom.Providers.DotNetCompilerPlatform" Version="*" /-->
 	<PackageReference Include="NAudio" Version="1.8.5" />
   </ItemGroup>
-  <ItemGroup>
-	<Content Include="BlankStage.bundle" />
-  </ItemGroup>
 </Project>

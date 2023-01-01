@@ -14,6 +14,7 @@ using System.Reflection;
 using UnityEngine;
 using UnityEngine.Networking;
 using System.Text;
+using CustomMapUtility.AssetBundleManager;
 #if !NOMP3
 using NAudio.Wave;
 #endif
@@ -67,26 +68,18 @@ namespace CustomMapUtility {
 							}
 						}
 					});
-					/*
-					_stagePaths = GetStageRootPaths();
-					_bgms = GetStageBgmInfos();
-					if (_stagePaths != null && _stagePaths.Count != 0) {
-						string stagePathsDebug = "CustomMapUtility StageRootPaths: {";
-						foreach (var dir in _stagePaths) {
-							stagePathsDebug += $"{Environment.NewLine}	{dir.FullName}";
+					foreach (var container in containerDic.Values) {
+						var bundle = container.resourceDir.EnumerateDirectories("AssetBundle")
+							.FirstOrDefault()?
+							.EnumerateFiles("cmumaptemplate.assets")
+							.FirstOrDefault();
+						if (bundle != null) {
+							var fullName = bundle.FullName;
+							MapTemplate.bundlePath = fullName;
+							MapTemplate.MapTemplateExists = true;
+							Debug.Log($"CustomMapUtility: Using template bundle at {fullName}");
 						}
-						stagePathsDebug += Environment.NewLine+"}";
-						Debug.Log(stagePathsDebug);
 					}
-					if (_bgms != null && _bgms.Count != 0) {
-						string bgmsDebug = "CustomMapUtility BgmPaths: {";
-						foreach (var path in _bgms) {
-							bgmsDebug += $"{Environment.NewLine}	{path.FullName}";
-						}
-						bgmsDebug += Environment.NewLine+"}";
-						Debug.Log(bgmsDebug);
-					}
-					*/
 					StringBuilder sb = new StringBuilder("CustomMapUtility: Mods using this version: {");
 					sb.AppendLine();
 					foreach (var modId in containerDic.Keys) {

@@ -10,6 +10,7 @@ using UnityEngine;
 using UnityEngine.Networking;
 using System.Threading.Tasks;
 using CustomMapUtility.Texture;
+using CustomMapUtility.AssetBundleManager;
 #if !NOMP3
 using NAudio.Wave;
 #endif
@@ -18,11 +19,11 @@ using Mod;
 
 namespace CustomMapUtility {
 	/// <summary>
-	/// Contains all internal CustomMapUtility commands.
+	/// Contains most internal CustomMapUtility commands.
 	/// </summary>
 	public partial class CustomMapHandler {
-		#pragma warning restore IDE0051,IDE0059,CS0219,IDE1006
 		#region HANDLER
+		#pragma warning disable CS1572
 		/// <summary>
 		/// Initializes a custom map.
 		/// </summary>
@@ -41,6 +42,7 @@ namespace CustomMapUtility {
 		/// <param name="undery">FloorUnder y pivot</param>
 		/// <param name="managerType">Your custom map manager</param>
 		/// <param name="offsets">A user-defined Offsets struct</param>
+		#pragma warning restore CS1572
 		public T InitCustomMap<T>(string stageName) where T : MapManager, ICMU, new() {
 			bool initBGMs = true;
 			if (mapOffsetsCache.TryGetValue(stageName, out Offsets offsets)) {
@@ -136,6 +138,8 @@ namespace CustomMapUtility {
 		protected bool loadIsInitted;
 		protected string stageName;
 		protected Task imageInitTask;
+		public virtual bool MapTemplateExists => MapTemplate.MapTemplateExists;
+		public virtual GameObject MapTemplateObject => MapTemplate.Asset;
 		public CustomMapHandler AudioHandler {
 			get => audioHandler ?? handler;
 			set => audioHandler = value;
@@ -165,7 +169,12 @@ namespace CustomMapUtility {
 			this.stageName = stageName;
 			this.offsets = offsets;
 
-			var mapObject = Util.LoadPrefab("InvitationMaps/InvitationMap_Philip1", SingletonBehavior<BattleSceneRoot>.Instance.transform);
+			GameObject mapObject;
+			if (MapTemplateExists) {
+				mapObject = UnityEngine.Object.Instantiate(MapTemplateObject, SingletonBehavior<BattleSceneRoot>.Instance.transform);
+			} else {
+				mapObject = Util.LoadPrefab("InvitationMaps/InvitationMap_Philip1", SingletonBehavior<BattleSceneRoot>.Instance.transform);
+			}
 
 			#region InheritanceDebug
 			#if InheritanceDebug
@@ -186,7 +195,7 @@ namespace CustomMapUtility {
 			if (managerAsync != null) {
 				imageInitTask = ImageInit_Async();
 			} else {
-				Debug.LogWarning($"CustomMapUtility: {typeof(T)} does not implement IAsyncMapInit");
+				Debug.LogWarning($"CustomMapUtility: {typeof(T)} does not implement {nameof(IAsyncMapInit)}");
 				#pragma warning disable CS0618
 				ImageInit();
 				#pragma warning restore CS0618
@@ -215,7 +224,7 @@ namespace CustomMapUtility {
 							managerTemp.AutoBGM = true;
 						}
 					} else {
-						Debug.LogWarning("CustomMapUtility: MapManager does not inherit from IBGM");
+						Debug.LogWarning($"CustomMapUtility: MapManager does not implement {nameof(IBGM)}");
 					}
 				} catch (Exception ex) {
 					Debug.LogError("CustomMapUtility: Failed to get BGMs");
@@ -404,6 +413,43 @@ namespace CustomMapUtility {
 		static TextureCache textureCache = null;
 
 		protected virtual void SetTextures(T manager) {
+			if (!MapTemplateExists) {
+				SetTextures_Fallback(manager);
+				return;
+			}
+			var roots = manager.GetRoots();
+
+			#region BG
+			var bg = roots[0].transform.GetComponentInChildren<SpriteRenderer>(true);
+			var bgSprite = newAssets["Background"];
+			if (bgSprite != null) {
+				bg.sprite = bgSprite;
+			} else {
+				bg.gameObject.SetActive(false);
+			}
+			#endregion
+
+			foreach (var renderer in roots[2].GetComponentsInChildren<SpriteRenderer>(true)) {
+				Sprite sprite;
+				var rendererName = renderer.name;
+				if (rendererName.StartsWith("F", StringComparison.Ordinal)) {
+					sprite = newAssets["Floor"];
+					if (sprite != null) {
+						renderer.sprite = sprite;
+					} else {
+						renderer.gameObject.SetActive(false);
+					}
+				} else if (rendererName.StartsWith("R", StringComparison.Ordinal)) {
+					sprite = newAssets["FloorUnder"];
+					if (sprite != null) {
+						renderer.sprite = sprite;
+					} else {
+						renderer.gameObject.SetActive(false);
+					}
+				}
+			}
+		}
+		protected virtual void SetTextures_Fallback(T manager) {
 			foreach (var component in manager.GetComponentsInChildren<Component>(true)) {
 				Sprite sprite;
 				switch (component) {

@@ -374,14 +374,14 @@ namespace CustomMapUtility
 		/// </summary>
 		/// <param name="num">Which map from the stage XML is chosen, or -1 for the Sephirah Map</param>
 		public void EnforceMap(int num = 0) {
+			var instance = Singleton<StageController>.Instance;
 			if (num >= 0) {
 				EnforceTheme();
 			} else {
 				UnEnforceTheme();
+				instance._mapChanged = true;
 			}
-			var instance = Singleton<StageController>.Instance;
 			instance.GetStageModel().SetCurrentMapInfo(num);
-			instance._mapChanged = true;
 		}
 		/// <summary>
 		/// Informs the game that the enemy's (and by extension custom) music should be active.

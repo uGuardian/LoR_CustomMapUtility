@@ -216,7 +216,7 @@ namespace CustomMapUtility {
 										var clips = AudioHandler.GetAudioClip(bgms);
 										if (!isEgo) {
 											// This is a very rudimentary auto-handler, it's far from perfect
-											CustomMapHandler.AntiEardrumDamage_Checked(true, clips);
+											AudioHandler.AntiEardrumDamage_Checked(true, clips);
 										}
 										manager.mapBgm = clips;
 									} catch (Exception ex) {

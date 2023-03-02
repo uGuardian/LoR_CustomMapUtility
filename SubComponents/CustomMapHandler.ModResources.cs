@@ -145,9 +145,7 @@ namespace CustomMapUtility {
 						AddErrorLog($"CustomMapUtility: ModID {uniqueId} exists in multiple directories");
 					}
 					// This shouldn't happen, but just to be sure this exists as a backup.
-					lock (oldContainer) {
-						oldContainer.CopyFrom(container);
-					}
+					oldContainer.CopyFrom(container);
 				}
 			}
 
@@ -286,25 +284,53 @@ namespace CustomMapUtility {
 				public Dictionary<string, FileInfo> GetStageBgmInfos(params string[] bgmNames) =>
 					GetStageBgmInfos((IEnumerable<string>)bgmNames);
 
+				readonly object copyLock = new object();
 				public void CopyFrom(CMUContainer other) {
-					foreach (var entry in other.stageDic) {
-						if (!stageDic.TryAdd(entry.Key, entry.Value)) {
-							if (!string.Equals(stageDic[entry.Key].FullName, entry.Value.FullName, StringComparison.Ordinal)) {
-								AddErrorLog($"CustomMapUtility: Conflict for stage {entry.Key} occured during container copy");
+					// Added a try catch because apparently it's possible for the below code to fail.
+					// This isn't thread safe if the "other" container is being modified.
+					lock (copyLock) {
+						var exceptionList = new List<Exception>();
+						string key;
+						foreach (var entry in other.stageDic) {
+							try {
+								key = entry.Key;
+								DirectoryInfo value = entry.Value;
+								if (!stageDic.TryAdd(key, value)) {
+									if (!string.Equals(stageDic[key].FullName, value.FullName, StringComparison.Ordinal)) {
+										AddErrorLog($"CustomMapUtility: Conflict for stage {key} occured during container copy");
+									}
+								}
+							} catch (Exception ex) {
+								exceptionList.Add(ex);
 							}
 						}
-					}
-					foreach (var entry in other.audioDic) {
-						if (!audioDic.TryAdd(entry.Key, entry.Value)) {
-							if (!string.Equals(stageDic[entry.Key].FullName, entry.Value.FullName, StringComparison.Ordinal)) {
-								AddErrorLog($"CustomMapUtility: Conflict for audio file {entry.Key} occured during container copy");
+						foreach (var entry in other.audioDic) {
+							try {
+								key = entry.Key;
+								FileInfo value = entry.Value;
+								if (!audioDic.TryAdd(key, value)) {
+									if (!string.Equals(stageDic[key].FullName, value.FullName, StringComparison.Ordinal)) {
+										AddErrorLog($"CustomMapUtility: Conflict for audio file {key} occured during container copy");
+									}
+								}
+							} catch (Exception ex) {
+								exceptionList.Add(ex);
 							}
+						}
+						if (exceptionList.Count > 0) {
+							AddErrorLog(new AggregateException(
+								$"CustomMapUtility: CopyFrom for container {this} encountered one or more errors.",
+								exceptionList
+							));
 						}
 					}
 				}
 				public bool ConfirmSameDirectory(CMUContainer other) => string.Equals(directory.FullName, other.directory.FullName);
 			}
 			static void AddErrorLog(string msg) => Singleton<ModContentManager>.Instance.AddErrorLog(msg);
+			static void AddErrorLog(string msg, Exception e) => Singleton<ModContentManager>.Instance.AddErrorLog(msg, e);
+			static void AddErrorLog(Exception e) => Singleton<ModContentManager>.Instance.AddErrorLog(e);
+			static void AddWarningLog(string msg) => Singleton<ModContentManager>.Instance.AddWarningLog(msg);
 		}
 		#endregion
 	}

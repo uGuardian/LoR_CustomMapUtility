@@ -36,20 +36,18 @@ namespace CustomMapUtility.Audio {
 					throw new InvalidOperationException($"{name}: {www.error}");
 				}
 				clip = DownloadHandlerAudioClip.GetContent(www);
-				clip.name = file.Name;
-				if (clip != null) {
-					return clip;
-				}
+				if (clip != null) {}
 				#if !NOMP3
 				else if (format == AudioType.MPEG) {
 					Debug.LogWarning("CustomMapUtility:AudioHandler: Falling back to NAudio and Custom WAV");
 					clip = NAudio_Handler.Parse(fullName);
-					return clip;
 				}
 				#endif
 				else {
 					throw new InvalidOperationException(name+": BGM Returned Null");
 				}
+				clip.name = name;
+				return clip;
 			}
 		}
 		protected override AudioClip GetFile_Internal(FileInfo file, out UnityWebRequestAsyncOperation operation) {

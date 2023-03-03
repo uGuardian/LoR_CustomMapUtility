@@ -31,7 +31,7 @@ namespace CustomMapUtility {
 				public const string version = "3.1.0";
 				#if PRERELEASE
 					#warning PRERELEASE
-					public const string feature = "Threaded_Log_Improvements";
+					public const string feature = "CopyFrom Fix";
 				#endif
 				internal static bool initialized = false;
 				internal static SynchronizationContext syncContext;
@@ -315,7 +315,7 @@ namespace CustomMapUtility {
 								key = entry.Key;
 								FileInfo value = entry.Value;
 								if (!audioDic.TryAdd(key, value)) {
-									if (!string.Equals(stageDic[key].FullName, value.FullName, StringComparison.Ordinal)) {
+									if (!string.Equals(audioDic[key].FullName, value.FullName, StringComparison.Ordinal)) {
 										AddErrorLog($"CustomMapUtility: Conflict for audio file {key} occured during container copy");
 									}
 								}

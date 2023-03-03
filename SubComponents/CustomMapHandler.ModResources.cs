@@ -20,6 +20,7 @@ using NAudio.Wave;
 #endif
 using Mod;
 using System.Xml.Serialization;
+using System.Threading;
 #pragma warning disable MA0048, MA0016, MA0051
 
 namespace CustomMapUtility {
@@ -30,11 +31,14 @@ namespace CustomMapUtility {
 				public const string version = "3.1.0";
 				#if PRERELEASE
 					#warning PRERELEASE
-					public const string feature = "LateInit_Containers";
+					public const string feature = "Threaded_Log_Improvements";
 				#endif
 				internal static bool initialized = false;
+				internal static SynchronizationContext syncContext;
 				public override void OnInitializeMod() {
 					if (initialized) {return;}
+					var fakeSyncContext = new FakeSyncContext();
+					syncContext = fakeSyncContext;
 					#if !PRERELEASE
 					Debug.Log($"CustomMapUtility Version \"{version}\"");
 					#else
@@ -42,6 +46,8 @@ namespace CustomMapUtility {
 					#endif
 					CreateContainersForReferencedAssemblies(Assembly.GetExecutingAssembly());
 					CheckBundle();
+					fakeSyncContext.ExecuteAll();
+					syncContext = SynchronizationContext.Current;
 					PrintModsUsingVersion(true);
 					initialized = true;
 				}
@@ -110,7 +116,7 @@ namespace CustomMapUtility {
 				CreateContainersForAssemblies(assemblies.AsParallel());
 			public static void CreateContainersForAssemblies(ParallelQuery<Assembly> assemblies) {
 				assemblies.Select(GetIdAndDirFromXml)
-				.ForAll(ParseDir);
+					.ForAll(ParseDir);
 				PostContainerCreate();
 			}
 
@@ -126,8 +132,8 @@ namespace CustomMapUtility {
 			}
 			public static void CreateContainersForModIDs(ParallelQuery<string> modIDs) {
 				modIDs.Select(GetIdAndDir)
-				.Where(x => x.dirInfo != null)
-				.ForAll(ParseDir);
+					.Where(x => x.dirInfo != null)
+					.ForAll(ParseDir);
 				PostContainerCreate();
 			}
 
@@ -327,10 +333,34 @@ namespace CustomMapUtility {
 				}
 				public bool ConfirmSameDirectory(CMUContainer other) => string.Equals(directory.FullName, other.directory.FullName);
 			}
-			static void AddErrorLog(string msg) => Singleton<ModContentManager>.Instance.AddErrorLog(msg);
-			static void AddErrorLog(string msg, Exception e) => Singleton<ModContentManager>.Instance.AddErrorLog(msg, e);
-			static void AddErrorLog(Exception e) => Singleton<ModContentManager>.Instance.AddErrorLog(e);
-			static void AddWarningLog(string msg) => Singleton<ModContentManager>.Instance.AddWarningLog(msg);
+			#region AdvancedLogging
+			internal class FakeSyncContext : SynchronizationContext {
+				readonly ConcurrentQueue<(SendOrPostCallback callback, object state)> queue;
+				public FakeSyncContext() : this(new ConcurrentQueue<(SendOrPostCallback callback, object state)>()) {}
+				private FakeSyncContext(ConcurrentQueue<(SendOrPostCallback callback, object state)> queue) {
+					this.queue = queue;
+				}
+				public override void Send(SendOrPostCallback callback, object state) => Post(callback, state);
+				public override void Post(SendOrPostCallback d, object state) => queue.Enqueue((d, state));
+				public override SynchronizationContext CreateCopy() => new FakeSyncContext(queue);
+				public void ExecuteAll() {
+					while (queue.TryDequeue(out var callbackTuple)) {
+						callbackTuple.callback(callbackTuple.state);
+					}
+				}
+			}
+			static void AddErrorLog(string msg) => CacheInit.syncContext.Send(AddErrorLog_Internal_String, msg);
+			static void AddErrorLog(string msg, Exception e) => CacheInit.syncContext.Send(AddErrorLog_Internal_Tuple, (msg, e));
+			static void AddErrorLog(Exception e) => CacheInit.syncContext.Send(AddErrorLog_Internal_Exception, e);
+			static void AddWarningLog(string msg) => CacheInit.syncContext.Send(AddWarningLog_Internal_String, msg);
+			static void AddErrorLog_Internal_String(object msg) => Singleton<ModContentManager>.Instance.AddErrorLog((string)msg);
+			static void AddErrorLog_Internal_Tuple(object tuple) {
+				(string msg, Exception e) = ((string msg, Exception e))tuple;
+				Singleton<ModContentManager>.Instance.AddErrorLog(msg, e);
+			}
+			static void AddErrorLog_Internal_Exception(object e) => Singleton<ModContentManager>.Instance.AddErrorLog((Exception)e);
+			static void AddWarningLog_Internal_String(object msg) => Singleton<ModContentManager>.Instance.AddWarningLog((string)msg);
+			#endregion
 		}
 		#endregion
 	}

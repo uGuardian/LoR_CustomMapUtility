@@ -44,7 +44,7 @@ namespace CustomMapUtility.Audio {
 				}
 				#endif
 				else {
-					throw new InvalidOperationException(name+": BGM Returned Null");
+					throw new InvalidOperationException($"CustomMapUtility:AudioHandler: {name}: AudioClip Returned Null");
 				}
 				clip.name = name;
 				return clip;
@@ -70,12 +70,18 @@ namespace CustomMapUtility.Audio {
 				}
 				clip = DownloadHandlerAudioClip.GetContent(www);
 				clip.name = file.Name;
-				if (clip != null) {
-					return clip;
+				if (clip != null) {}
+				#if !NOMP3
+				else if (format == AudioType.MPEG) {
+					Debug.LogWarning("CustomMapUtility:AudioHandler: Falling back to NAudio and Custom WAV");
+					clip = NAudio_Handler.Parse(fullName);
 				}
+				#endif
 				else {
-					throw new InvalidOperationException(name+": Image Returned Null");
+					throw new InvalidOperationException($"CustomMapUtility:AudioHandler: {name}: AudioClip Returned Null");
 				}
+				clip.name = name;
+				return clip;
 			}
 		}
 		public static AudioType GetTypeOfFile (FileInfo file) {

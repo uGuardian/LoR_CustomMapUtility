@@ -21,6 +21,8 @@ using NAudio.Wave;
 using Mod;
 using System.Xml.Serialization;
 using System.Threading;
+using System.Threading.Tasks;
+using uGuardian.Utilities.Threading;
 #pragma warning disable MA0048, MA0016, MA0051
 
 namespace CustomMapUtility {
@@ -31,14 +33,20 @@ namespace CustomMapUtility {
 				public const string version = "3.1.0";
 				#if PRERELEASE
 					#warning PRERELEASE
-					public const string feature = "CopyFrom Fix";
+					public const string feature = "MP3_Optimization";
 				#endif
 				internal static bool initialized = false;
-				internal static SynchronizationContext syncContext;
+				internal static SynchronizationContext unitySyncContext;
+				internal static ImmediateUnitySynchronizationContext masterSyncContext;
+				private static void InitSyncContext() {
+					if (masterSyncContext != null) {return;}
+					unitySyncContext = SynchronizationContext.Current;
+					ImmediateUnitySynchronizationContext.InitializeSynchronizationContext(unitySyncContext);
+					masterSyncContext = new ImmediateUnitySynchronizationContext();
+				}
 				public override void OnInitializeMod() {
 					if (initialized) {return;}
-					var fakeSyncContext = new FakeSyncContext();
-					syncContext = fakeSyncContext;
+					InitSyncContext();
 					#if !PRERELEASE
 					Debug.Log($"CustomMapUtility Version \"{version}\"");
 					#else
@@ -46,8 +54,7 @@ namespace CustomMapUtility {
 					#endif
 					CreateContainersForReferencedAssemblies(Assembly.GetExecutingAssembly());
 					CheckBundle();
-					fakeSyncContext.ExecuteAll();
-					syncContext = SynchronizationContext.Current;
+					masterSyncContext.ExecuteAll();
 					PrintModsUsingVersion(true);
 					initialized = true;
 				}
@@ -334,25 +341,10 @@ namespace CustomMapUtility {
 				public bool ConfirmSameDirectory(CMUContainer other) => string.Equals(directory.FullName, other.directory.FullName);
 			}
 			#region AdvancedLogging
-			internal class FakeSyncContext : SynchronizationContext {
-				readonly ConcurrentQueue<(SendOrPostCallback callback, object state)> queue;
-				public FakeSyncContext() : this(new ConcurrentQueue<(SendOrPostCallback callback, object state)>()) {}
-				private FakeSyncContext(ConcurrentQueue<(SendOrPostCallback callback, object state)> queue) {
-					this.queue = queue;
-				}
-				public override void Send(SendOrPostCallback callback, object state) => Post(callback, state);
-				public override void Post(SendOrPostCallback d, object state) => queue.Enqueue((d, state));
-				public override SynchronizationContext CreateCopy() => new FakeSyncContext(queue);
-				public void ExecuteAll() {
-					while (queue.TryDequeue(out var callbackTuple)) {
-						callbackTuple.callback(callbackTuple.state);
-					}
-				}
-			}
-			static void AddErrorLog(string msg) => CacheInit.syncContext.Send(AddErrorLog_Internal_String, msg);
-			static void AddErrorLog(string msg, Exception e) => CacheInit.syncContext.Send(AddErrorLog_Internal_Tuple, (msg, e));
-			static void AddErrorLog(Exception e) => CacheInit.syncContext.Send(AddErrorLog_Internal_Exception, e);
-			static void AddWarningLog(string msg) => CacheInit.syncContext.Send(AddWarningLog_Internal_String, msg);
+			static void AddErrorLog(string msg) => CacheInit.masterSyncContext.Send(AddErrorLog_Internal_String, msg);
+			static void AddErrorLog(string msg, Exception e) => CacheInit.masterSyncContext.Send(AddErrorLog_Internal_Tuple, (msg, e));
+			static void AddErrorLog(Exception e) => CacheInit.masterSyncContext.Send(AddErrorLog_Internal_Exception, e);
+			static void AddWarningLog(string msg) => CacheInit.masterSyncContext.Send(AddWarningLog_Internal_String, msg);
 			static void AddErrorLog_Internal_String(object msg) => Singleton<ModContentManager>.Instance.AddErrorLog((string)msg);
 			static void AddErrorLog_Internal_Tuple(object tuple) {
 				(string msg, Exception e) = ((string msg, Exception e))tuple;

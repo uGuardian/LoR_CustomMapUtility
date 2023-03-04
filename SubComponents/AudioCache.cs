@@ -10,6 +10,7 @@ using System.IO;
 using System.Threading.Tasks;
 using uGuardian.WAV;
 using uGuardian.Utilities;
+using uGuardian.Utilities.Threading;
 #if !NOMP3
 using NAudio.Wave;
 #endif
@@ -26,64 +27,71 @@ namespace CustomMapUtility.Audio {
 				return clip;
 			}
 
-			using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip($"file://{fullName}", format)) {
-				var source = www.SendWebRequest().GetTaskCompletionSource();
-				tasksInternal.Add(fullName, source);
-				await source.Task;
-				tasksInternal.Remove(fullName);
+			#if !NOMP3
+			else if (format == AudioType.MPEG) {
+				return GetFile_MP3(file);
+			}
+			#endif
 
-				if (www.isNetworkError) {
-					throw new InvalidOperationException($"{name}: {www.error}");
-				}
-				clip = DownloadHandlerAudioClip.GetContent(www);
-				if (clip != null) {}
-				#if !NOMP3
-				else if (format == AudioType.MPEG) {
-					Debug.LogWarning("CustomMapUtility:AudioHandler: Falling back to NAudio and Custom WAV");
-					clip = NAudio_Handler.Parse(fullName);
-				}
-				#endif
-				else {
-					throw new InvalidOperationException($"CustomMapUtility:AudioHandler: {name}: AudioClip Returned Null");
-				}
-				clip.name = name;
+			using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip($"file://{fullName}", format)) {
+				var source = www.SendWebRequest().GetWaitableTaskCompletionSource((_) => {
+					if (www.isNetworkError) {
+						throw new InvalidOperationException($"{name}: {www.error}");
+					}
+					clip = DownloadHandlerAudioClip.GetContent(www);
+					if (clip != null) {}
+					else {
+						throw new InvalidOperationException($"CustomMapUtility:AudioHandler: {name}: AudioClip Returned Null");
+					}
+					clip.name = name;
+					return clip;
+				});
+				tasksInternal.Add(fullName, source);
+				clip = await source.Task;
+				tasksInternal.Remove(fullName);
 				return clip;
 			}
 		}
-		protected override AudioClip GetFile_Internal(FileInfo file, out UnityWebRequestAsyncOperation operation) {
+		protected override AudioClip GetFile_Internal(FileInfo file) {
 			var fullName = file.FullName;
 			var format = GetTypeOfFile(file);
 			var name = file.Name;
-			operation = null;
 
 			AudioClip clip = CheckCache(file);
 			if (clip != null) {
 				return clip;
 			}
 
+			#if !NOMP3
+			if (format == AudioType.MPEG) {
+				return GetFile_MP3(file);
+			}
+			#endif
+
 			using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip($"file://{fullName}", format)) {
-				operation = www.SendWebRequest();
-				operation.SpinWait();
+				var source = www.SendWebRequest();
+				source.SpinWait();
 
 				if (www.isNetworkError) {
 					throw new InvalidOperationException($"{name}: {www.error}");
 				}
 				clip = DownloadHandlerAudioClip.GetContent(www);
 				clip.name = file.Name;
-				if (clip != null) {}
-				#if !NOMP3
-				else if (format == AudioType.MPEG) {
-					Debug.LogWarning("CustomMapUtility:AudioHandler: Falling back to NAudio and Custom WAV");
-					clip = NAudio_Handler.Parse(fullName);
-				}
-				#endif
-				else {
+				if (clip == null) {
 					throw new InvalidOperationException($"CustomMapUtility:AudioHandler: {name}: AudioClip Returned Null");
 				}
 				clip.name = name;
 				return clip;
 			}
 		}
+		#if !NOMP3
+		AudioClip GetFile_MP3(FileInfo file) {
+			Debug.Log("CustomMapUtility:AudioHandler: Falling back to NAudio");
+			var clip = NAudio_Handler.Parse(file.FullName);
+			clip.name = file.Name;
+			return clip;
+		}
+		#endif
 		public static AudioType GetTypeOfFile (FileInfo file) {
 			switch (file.Extension.ToUpperInvariant()) {
 				case ".WAVE":
@@ -133,13 +141,19 @@ namespace CustomMapUtility.Audio {
 		#if !NOMP3
 		private static class NAudio_Handler {
 			public static AudioClip Parse(string path) {
-				WAV wav;
-				using (var sourceProvider = new Mp3FileReader(path)) {
-					MemoryStream stream = new MemoryStream();
-					WaveFileWriter.WriteWavFileToStream(stream, sourceProvider);
-					wav = new WAV(stream.ToArray());
-					return ParseWAV(wav);
-				}
+				var sourceProvider = new Mp3FileReader(path);
+				var container = new ReaderContainer(sourceProvider);
+				var format = sourceProvider.Mp3WaveFormat;
+				var clip = AudioClip.Create("BGM",
+					(int)sourceProvider.totalSamples,
+					format.Channels,
+					format.SampleRate,
+					stream: true,
+					new AudioClip.PCMReaderCallback(container.ContinueStream),
+					new AudioClip.PCMSetPositionCallback(container.SetPosition)
+				);
+				container.clip = clip;
+				return clip;
 			}
 			public static AudioClip ParseWAV(string path) => ParseWAV(new WAV(path));
 			public static AudioClip ParseWAV(WAV wav) {
@@ -150,6 +164,31 @@ namespace CustomMapUtility.Audio {
 				audioClip.SetData(wav.InterleavedAudio, 0);
 				Debug.Log($"Parse Result: {wav}");
 				return audioClip;
+			}
+			public class ReaderContainer : IDisposable {
+				readonly Mp3FileReader reader;
+				public AudioClip clip;
+				byte[] buffer = new byte[0];
+				public ReaderContainer(Mp3FileReader reader) {
+					this.reader = reader;
+				}
+				public void ContinueStream(float[] data) {
+					var length = data.Length * 2;
+					if (buffer.Length < length) {
+						buffer = new byte[length];
+					}
+					reader.Read(buffer, 0, length);
+					for (int i = 0; i < length; i += 2) {
+						data[i/2] = WAV.BytesToFloat(buffer[i], buffer[i+1]);
+					}
+				}
+				public void SetPosition(int position) {
+					reader.Seek(position * 2, SeekOrigin.Begin);
+				}
+
+				public void Dispose() {
+					reader.Dispose();
+				}
 			}
 		}
 		#endif

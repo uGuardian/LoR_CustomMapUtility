@@ -22,33 +22,33 @@ namespace CustomMapUtility.Texture {
 			}
 
 			using (UnityWebRequest www = UnityWebRequestTexture.GetTexture($"file://{fullName}")) {
-				var source = www.SendWebRequest().GetTaskCompletionSource();
+				var source = www.SendWebRequest().GetWaitableTaskCompletionSource((operation) => {
+					if (www.isNetworkError) {
+						throw new InvalidOperationException($"{name}: {www.error}");
+					}
+					texture = DownloadHandlerTexture.GetContent(www);
+					texture.name = file.Name;
+					if (texture != null) {
+						goto finishEntry;
+					}
+					else {
+						throw new InvalidOperationException(name+": Image Returned Null");
+					}
+
+					finishEntry:
+					dictionary[fullName] = texture;
+					heldFile[fullName] = new WeakReference<Texture2D>(texture);
+					return texture;
+				});
 				tasksInternal.Add(fullName, source);
-				await source.Task;
+				texture = await source.Task;
 				tasksInternal.Remove(fullName);
-
-				if (www.isNetworkError) {
-					throw new InvalidOperationException($"{name}: {www.error}");
-				}
-				texture = DownloadHandlerTexture.GetContent(www);
-				texture.name = file.Name;
-				if (texture != null) {
-					goto finishEntry;
-				}
-				else {
-					throw new InvalidOperationException(name+": Image Returned Null");
-				}
-
-				finishEntry:
-				dictionary[fullName] = texture;
-				heldFile[fullName] = new WeakReference<Texture2D>(texture);
 				return texture;
 			}
 		}
-		protected override Texture2D GetFile_Internal(FileInfo file, out UnityWebRequestAsyncOperation operation) {
+		protected override Texture2D GetFile_Internal(FileInfo file) {
 			var fullName = file.FullName;
 			var name = file.Name;
-			operation = null;
 
 			Texture2D texture = CheckCache(file);
 			if (texture != null) {
@@ -56,8 +56,8 @@ namespace CustomMapUtility.Texture {
 			}
 
 			using (UnityWebRequest www = UnityWebRequestTexture.GetTexture($"file://{fullName}")) {
-				operation = www.SendWebRequest();
-				operation.SpinWait();
+				var source = www.SendWebRequest();
+				source.SpinWait();
 
 				if (www.isNetworkError) {
 					throw new InvalidOperationException($"{name}: {www.error}");

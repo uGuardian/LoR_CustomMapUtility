@@ -2,7 +2,7 @@ using CustomMapUtility;
 
 namespace Template {
     public class EnemyTeamStageManager_Template : EnemyTeamStageManager {
-        CustomMapHandler cmh = new CustomMapHandler("TemplateModId");
+        CustomMapHandler cmh = CustomMapHandler.GetCMU("TemplateModId");
         public override void OnWaveStart() {
             // This method must be called somewhere, and only once. StageManager or Passive in the OnWaveStart() method is recommended.
             // You MUST have <MapInfo>Template</MapInfo> inside your StageInfo.xml file. (Replace Template with your stage name)
@@ -17,10 +17,10 @@ namespace Template {
     }
 
     public class TemplateMapManager : CustomMapManager {
-        protected internal override string[] CustomBGMs {
+        protected override string[] CustomBGMs {
             get {
                 // Put the file name of your BGM here, you don't need the full path.
-                return new string[] {"MyBGM.mp3"};
+                return new string[] {"MyBGM.ogg"};
             }
         }
     }

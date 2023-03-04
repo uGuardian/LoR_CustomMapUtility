@@ -365,7 +365,4 @@
 	  <HintPath>..\libs\NAudio-nstrip.dll</HintPath>
 	</Reference>
   </ItemGroup>
-  <ItemGroup>
-	<Content Include="BlankStage.bundle" />
-  </ItemGroup>
 </Project>

@@ -169,10 +169,14 @@ namespace CustomMapUtility.Audio {
 				readonly Mp3FileReader reader;
 				public AudioClip clip;
 				byte[] buffer = new byte[0];
+				private bool disposed;
+
 				public ReaderContainer(Mp3FileReader reader) {
 					this.reader = reader;
 				}
 				public void ContinueStream(float[] data) {
+					if (disposed) {throw new ObjectDisposedException(nameof(reader));}
+
 					var length = data.Length * 2;
 					if (buffer.Length < length) {
 						buffer = new byte[length];
@@ -183,11 +187,36 @@ namespace CustomMapUtility.Audio {
 					}
 				}
 				public void SetPosition(int position) {
+					if (disposed) {throw new ObjectDisposedException(nameof(reader));}
+
+					// REVIEW - Check to make sure this actually works properly
 					reader.Seek(position * 2, SeekOrigin.Begin);
 				}
 
+				protected virtual void Dispose(bool disposing) {
+					if (!disposed) {
+						reader.Dispose();
+
+						// No disposing check because all disposals are actually supposed to be handled by the GC.
+						// This isn't good practice, but it's by far the most practical way to implement it currently.
+
+						clip = null;
+						buffer = null;
+
+						disposed = true;
+					}
+				}
+
+				// TODO: override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
+				~ReaderContainer() {
+				    // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+				    Dispose(disposing: false);
+				}
+
 				public void Dispose() {
-					reader.Dispose();
+					// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+					Dispose(disposing: true);
+					GC.SuppressFinalize(this);
 				}
 			}
 		}

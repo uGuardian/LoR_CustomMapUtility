@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -211,12 +212,20 @@ namespace CustomMapUtility {
 							} else {
 								AudioHandler.CustomBgmParseAsync(bgms);
 								managerAsync.FirstLoad += (object sender, EventArgs e) => {
-									var clips = AudioHandler.GetAudioClip(bgms);
-									if (!isEgo) {
-										// This is a very rudimentary auto-handler, it's far from perfect
-										CustomMapHandler.AntiEardrumDamage_Checked(true, clips);
+									try {
+										var clips = AudioHandler.GetAudioClip(bgms);
+										if (!isEgo) {
+											// This is a very rudimentary auto-handler, it's far from perfect
+											AudioHandler.AntiEardrumDamage_Checked(true, clips);
+										}
+										manager.mapBgm = clips;
+									} catch (Exception ex) {
+										var sb = new StringBuilder("CustomMapUtility: AudioInit for ");
+										sb.Append(stageName);
+										sb.AppendLine(" failed with exception:");
+										sb.Append(ex);
+										Debug.LogError(sb);
 									}
-									manager.mapBgm = clips;
 								};
 							}
 						} else {
@@ -319,7 +328,15 @@ namespace CustomMapUtility {
 		*/
 
 		protected void CompleteImageInit(object sender, EventArgs e) {
-			TextureCache.AwaitCompletion(imageInitTask);
+			try {
+				TextureCache.AwaitCompletion(imageInitTask);
+			} catch (Exception ex) {
+				var sb = new StringBuilder("CustomMapUtility: ImageInit for ");
+				sb.Append(stageName);
+				sb.AppendLine(" failed with exception:");
+				sb.Append(ex);
+				Debug.LogError(sb);
+			}
 		}
 
 		public Sprite SpriteLoad(string name, FileInfo file) {

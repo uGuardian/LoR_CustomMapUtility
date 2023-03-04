@@ -360,6 +360,9 @@
 	<!--PackageReference Include="Microsoft.CodeAnalysis" Version="4.0.0" /-->
 	<!--PackageReference Include="Meziantou.Analyzer" Version="*" /-->
 	<!--PackageReference Include="Microsoft.CodeDom.Providers.DotNetCompilerPlatform" Version="*" /-->
-	<PackageReference Include="NAudio" Version="1.8.5" />
+	<!--PackageReference Include="NAudio" Version="1.8.5" /-->
+	<Reference Include="NAudio">
+	  <HintPath>..\libs\NAudio-nstrip.dll</HintPath>
+	</Reference>
   </ItemGroup>
 </Project>

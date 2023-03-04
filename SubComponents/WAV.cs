@@ -7,7 +7,7 @@ using UnityEngine;
 namespace uGuardian.WAV {
 	[StructLayout(LayoutKind.Sequential, Pack=1)]
 	public readonly struct WAV {
-		private static float BytesToFloat(byte firstByte, byte secondByte)
+		public static float BytesToFloat(byte firstByte, byte secondByte)
 		{
 			var num = (short)(secondByte << 8 | firstByte);
 			return num / 32768f;

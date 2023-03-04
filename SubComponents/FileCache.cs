@@ -17,8 +17,8 @@ namespace CustomMapUtility.Caching {
 			new ConcurrentDictionary<string, T>(StringComparer.Ordinal);
 		protected readonly Dictionary<string, Task<T>> tasks =
 			new Dictionary<string, Task<T>>(StringComparer.Ordinal);
-		protected readonly Dictionary<string, TaskCompletionSource<AsyncOperation>> tasksInternal =
-			new Dictionary<string, TaskCompletionSource<AsyncOperation>>(StringComparer.Ordinal);
+		protected readonly Dictionary<string, CustomTaskCompletionSource<T>> tasksInternal =
+			new Dictionary<string, CustomTaskCompletionSource<T>>(StringComparer.Ordinal);
 
 		public T CheckCache(FileInfo info) {
 			var fullName = info.FullName;
@@ -103,24 +103,25 @@ namespace CustomMapUtility.Caching {
 					#if DEBUG
 					Debug.Log($"CustomMapUtility:FileCache: Loading {name}");
 					#endif
-					result = GetFile_Internal(file, out var operation);
+					if (internalTaskExists && taskCompletionSource.Task.AsyncState is Task<T> subTask) {
+						result = subTask.Result;
+						goto complete;
+					}
+					result = GetFile_Internal(file);
 					if (internalTaskExists) {
-						taskCompletionSource.TrySetResult(operation);
+						taskCompletionSource.TrySetResult(result);
 					}
 					goto complete;
 				} else if (!task.IsCompleted && internalTaskExists) {
 					Debug.Log($"CustomMapUtility:FileCache: Completing load of {name}");
-					taskCompletionSource.SpinWait();
-					if (!(task.AsyncState is UnityWebRequestAsyncOperation operation)) {
-						throw new InvalidOperationException();
-					}
+					taskCompletionSource.Wait();
 				}
 				result = task.Result;
 			} else {
 				#if DEBUG
 				Debug.Log($"CustomMapUtility:FileCache: Loading {name}");
 				#endif
-				result = GetFile_Internal(file, out _);
+				result = GetFile_Internal(file);
 			}
 
 			complete:
@@ -128,7 +129,7 @@ namespace CustomMapUtility.Caching {
 			heldFile[fullName] = new WeakReference<T>(result);
 			return result;
 		}
-		protected abstract T GetFile_Internal(FileInfo file, out UnityWebRequestAsyncOperation operation);
+		protected abstract T GetFile_Internal(FileInfo file);
 		protected void OnDisable() {
 			dictionary.Clear();
 			StopAllCoroutines();

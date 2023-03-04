@@ -39,7 +39,10 @@ namespace CustomMapUtility {
 			if (!ModResources.containerDic.TryGetValue(modId, out container)) {
 				new ModResources.CacheInit().OnInitializeMod();
 				if (!ModResources.containerDic.TryGetValue(modId, out container)) {
-					throw new FileNotFoundException($"CustomMapUtility container for {modId} does not exist");
+					ModResources.CreateContainersForModIDs(modId);
+					if (!ModResources.containerDic.TryGetValue(modId, out container)) {
+						throw new FileNotFoundException($"CustomMapUtility container for {modId} does not exist");
+					}
 				}
 			}
 		}

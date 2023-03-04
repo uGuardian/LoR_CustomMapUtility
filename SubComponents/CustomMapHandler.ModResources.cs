@@ -30,7 +30,7 @@ namespace CustomMapUtility {
 		#region RESOURCES
 		public static class ModResources {
 			public class CacheInit : ModInitializer {
-				public const string version = "3.1.0";
+				public const string version = "3.1.1";
 				#if PRERELEASE
 					#warning PRERELEASE
 					public const string feature = "MP3_Optimization";

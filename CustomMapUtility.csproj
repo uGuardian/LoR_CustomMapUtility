@@ -349,14 +349,10 @@
 	<Reference Include="UnityEngine.XRModule">
 	  <HintPath>..\libs\Managed\UnityEngine.XRModule.dll</HintPath>
 	</Reference>
-	<Compile Remove="Template.cs" />
-	<Compile Remove="AdvTemplate.cs" />
-	<Compile Remove="Assemblies\Wav_Old.cs" />
-	<Compile Remove="Collections.cs" />
+	<Compile Remove="Template\*" />
+	<Compile Remove="uGuardian\Collections\Specialized\Collections.cs" />
   </ItemGroup>
   <ItemGroup>
-	<Compile Remove="..\CustomMapUtility\Assemblies\*" />
-	<Compile Remove="Assemblies\Wav_Old.cs" />
 	<!--PackageReference Include="Microsoft.CodeAnalysis" Version="4.0.0" /-->
 	<!--PackageReference Include="Meziantou.Analyzer" Version="*" /-->
 	<!--PackageReference Include="Microsoft.CodeDom.Providers.DotNetCompilerPlatform" Version="*" /-->
